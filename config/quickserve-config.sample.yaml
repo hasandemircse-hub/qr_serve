@@ -1,0 +1,30 @@
+# Bu dosyayı kopyalayıp `config/quickserve-config.yaml` olarak kaydedin (repo kökü).
+# Edge çalışma dizini workspace kökü olduğunda `spring.config.import` bu dosyayı yükler.
+
+quickserve:
+  mode: FULL_STACK
+  # İlk kurulum sihirbazı: true yaptığınızda veritabanında setup_wizard_completed=false
+  # olmalıdır (aksi halde mevcut kurulumlar wizard göstermez; Flyway varsayılanı true).
+  setup:
+    wizard-enabled: false
+  cloud:
+    base-url: http://localhost:8080
+    mock: false
+  jwt:
+    secret: "CHANGE_ME_MIN_32_BYTES_FOR_PRODUCTION_USE"
+    expiration-hours: 24
+  public-edge-url: "http://192.168.1.10:8081"
+  edge-id: "550e8400-e29b-41d4-a716-446655440000"
+  restaurant-id: "11111111-1111-1111-1111-111111111111"
+  print:
+    enabled: true
+    charset: UTF-8
+    default-network-port: 9100
+    slip-width-chars: 42
+    printers:
+      - id: kitchen-1
+        station: KITCHEN
+        connection: NETWORK
+        network-host: 192.168.1.50
+        network-port: 9100
+        template: kitchen-slip

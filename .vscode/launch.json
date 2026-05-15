@@ -1,0 +1,36 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"type": "java",
+			"name": "QuickServe Cloud (profile: local)",
+			"request": "launch",
+			"mainClass": "com.qr.cloud.CloudApplication",
+			"projectName": "cloud",
+			"args": "--spring.profiles.active=local"
+		},
+		{
+			"type": "java",
+			"name": "QuickServe Edge (profile: local)",
+			"request": "launch",
+			"mainClass": "com.qr.edge.EdgeApplication",
+			"projectName": "edge",
+			"args": "--spring.profiles.active=local",
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "dart",
+			"name": "Flutter: edge_frontend",
+			"request": "launch",
+			"cwd": "${workspaceFolder}/edge_frontend",
+			"program": "lib/main.dart"
+		},
+		{
+			"type": "dart",
+			"name": "Flutter: cloud_frontend",
+			"request": "launch",
+			"cwd": "${workspaceFolder}/cloud_frontend",
+			"program": "lib/main.dart"
+		}
+	]
+}

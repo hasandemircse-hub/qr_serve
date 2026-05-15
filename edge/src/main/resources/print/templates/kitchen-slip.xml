@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<slip widthChars="42">
+	<text large="true" bold="true">MUTFAK</text>
+	<line/>
+	<text>Siparis: ${orderNumber}</text>
+	<text>Masa: ${tableLabel}</text>
+	<text>${productName}  x${quantity}</text>
+	<text>${orderedAt}</text>
+	<feed lines="3"/>
+	<cut/>
+</slip>

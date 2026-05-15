@@ -1,0 +1,27 @@
+# JWT: Cloud ile aynı QUICKSERVE_JWT_SECRET kullanın (istemci token doğrulaması).
+# Canlı edge: PostgreSQL + ortamdan edge/restoran kimliği ve cloud adresi.
+# Örnek:
+#   SPRING_DATASOURCE_URL=jdbc:postgresql://host:5432/quickserve_edge
+#   SPRING_DATASOURCE_USERNAME=...
+#   SPRING_DATASOURCE_PASSWORD=...
+#   QUICKSERVE_CLOUD_BASE_URL=https://cloud.ornek.com
+#   QUICKSERVE_EDGE_ID=<uuid>
+#   QUICKSERVE_RESTAURANT_ID=<uuid>
+quickserve:
+  jwt:
+    secret: ${QUICKSERVE_JWT_SECRET}
+    expiration-hours: 24
+  public-edge-url: ${QUICKSERVE_PUBLIC_EDGE_URL:http://127.0.0.1:8081}
+  cloud:
+    base-url: ${QUICKSERVE_CLOUD_BASE_URL}
+  edge-id: ${QUICKSERVE_EDGE_ID}
+  restaurant-id: ${QUICKSERVE_RESTAURANT_ID}
+
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    locations: classpath:db/migration

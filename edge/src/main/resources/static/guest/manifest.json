@@ -1,0 +1,10 @@
+{
+  "name": "QuickServe QR Menü",
+  "short_name": "QR Menü",
+  "description": "Masa QR menü ve sipariş durumu",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0d9488",
+  "lang": "tr"
+}

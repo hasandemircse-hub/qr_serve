@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0d9488" />
+  <title>QuickServe — QR Menü</title>
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="top">
+    <h1 id="title">QR Menü</h1>
+    <p id="subtitle" class="muted"></p>
+  </header>
+
+  <nav class="tabs">
+    <button type="button" data-tab="menu" class="tab active">Menü</button>
+    <button type="button" data-tab="cart" class="tab">Sepet <span id="cartBadge" class="badge">0</span></button>
+    <button type="button" data-tab="status" class="tab">Durum</button>
+  </nav>
+
+  <section id="panel-menu" class="panel active">
+    <div id="menuList" class="stack"></div>
+  </section>
+
+  <section id="panel-cart" class="panel">
+    <div id="cartList" class="stack"></div>
+    <div class="actions">
+      <button type="button" id="btnConfirm" class="primary" disabled>Siparişi Onayla</button>
+    </div>
+  </section>
+
+  <section id="panel-status" class="panel">
+    <p id="statusHint" class="muted" style="margin-top:0">
+      Sipariş verdikten sonra mutfak durumu burada güncellenir. Sayfayı yenilerseniz son kayıtlar sunucudan tekrar yüklenir.
+    </p>
+    <div id="statusOrders" class="stack"></div>
+    <div class="actions">
+      <button type="button" id="btnRefreshStatus" class="secondary">Durumu yenile</button>
+      <button type="button" id="btnWaiter" class="secondary">Garson Çağır</button>
+      <button type="button" id="btnBill" class="secondary">Hesabı İste</button>
+    </div>
+    <details class="tech-log">
+      <summary>Teknik günlük (WebSocket)</summary>
+      <pre id="wsLog" class="log"></pre>
+    </details>
+  </section>
+
+  <div id="modal" class="modal hidden" role="dialog">
+    <div class="modal-card">
+      <h2 id="modalTitle"></h2>
+      <div id="modalBody" class="stack"></div>
+      <div class="actions">
+        <button type="button" id="modalCancel" class="ghost">Vazgeç</button>
+        <button type="button" id="modalAdd" class="primary" disabled>Sepete Ekle</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>

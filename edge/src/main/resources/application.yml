@@ -1,0 +1,64 @@
+server:
+  port: 8081
+
+spring:
+  config:
+    import: optional:file:./config/quickserve-config.yaml
+  application:
+    name: quickserve-edge
+  datasource:
+    url: jdbc:postgresql://localhost:5432/quickserve_edge
+    username: quickserve
+    password: quickserve
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+quickserve:
+  mode: ${MODE:FULL_STACK}
+  jwt:
+    secret: "local-dev-only-change-in-production-min-32-bytes!!"
+    expiration-hours: 24
+  public-edge-url: "http://127.0.0.1:8081"
+  edge-id: "550e8400-e29b-41d4-a716-446655440000"
+  restaurant-id: "11111111-1111-1111-1111-111111111111"
+  guest-lab-enabled: false
+  cloud:
+    base-url: http://localhost:8080
+    mock: false
+  setup:
+    wizard-enabled: false
+  edge:
+    sync:
+      enabled: true
+      scheduler-enabled: true
+      batch-size: 50
+      poll-interval-ms: 5000
+  print:
+    enabled: true
+    charset: UTF-8
+    default-network-port: 9100
+    slip-width-chars: 42
+    printers: []
+    # Örnek (yorumu kaldırıp doldurun):
+    # printers:
+    #   - id: kitchen-1
+    #     station: KITCHEN
+    #     connection: NETWORK
+    #     network-host: 192.168.1.50
+    #     network-port: 9100
+    #     template: kitchen-slip
+    #   - id: cashier-usb
+    #     station: CASHIER
+    #     connection: USB_RAW
+    #     usb-device-path: /dev/usb/lp0
+    #     template: adisyon-default

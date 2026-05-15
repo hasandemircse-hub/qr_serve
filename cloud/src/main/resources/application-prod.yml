@@ -1,0 +1,20 @@
+# JWT canlı ortam (aynı gizli anahtar Edge ile paylaşılmalıdır):
+#   QUICKSERVE_JWT_SECRET=<en az 32 karakter>
+quickserve:
+  jwt:
+    secret: ${QUICKSERVE_JWT_SECRET}
+    expiration-hours: 24
+
+# Canlı ortam: PostgreSQL bağlantısı ortam değişkenleri ile verilir.
+# Örnek:
+#   SPRING_DATASOURCE_URL=jdbc:postgresql://host:5432/quickserve_cloud
+#   SPRING_DATASOURCE_USERNAME=...
+#   SPRING_DATASOURCE_PASSWORD=...
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    locations: classpath:db/migration

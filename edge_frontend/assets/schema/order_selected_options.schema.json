@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quickserve.local/schemas/order_selected_options.schema.json",
+  "title": "OrderLine selectedOptions (JSONB)",
+  "description": "QR sipariş sihirbazı çıktısı; order_line_items.selected_options kolonunda saklanır.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "steps"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "steps": {
+      "type": "array",
+      "description": "Her adım bir seçenek grubuna karşılık gelir (wizard sırası).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["groupId", "selectionType", "selectedOptionIds"],
+        "properties": {
+          "groupId": { "type": "string", "format": "uuid" },
+          "selectionType": { "type": "string", "enum": ["SINGLE", "MULTI"] },
+          "selectedOptionIds": {
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" },
+            "description": "SINGLE: tam 1 eleman; MULTI: 0 veya daha fazla."
+          }
+        }
+      }
+    },
+    "optionsTotalAdjustment": {
+      "type": "number",
+      "description": "İsteğe bağlı özet; sunucu doğrulamasında yeniden hesaplanabilir."
+    }
+  }
+}

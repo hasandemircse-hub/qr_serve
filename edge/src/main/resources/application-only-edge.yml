@@ -1,0 +1,12 @@
+# IDE: --spring.profiles.active=local,only-edge veya MODE=ONLY_EDGE ile birlikte kullanın.
+spring:
+  config:
+    activate:
+      on-profile: only-edge
+
+quickserve:
+  cloud:
+    mock: true
+  edge:
+    discovery:
+      hello-on-startup: false

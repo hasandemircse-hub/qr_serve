@@ -1,0 +1,24 @@
+quickserve:
+  jwt:
+    secret: "local-dev-only-change-in-production-min-32-bytes!!"
+    expiration-hours: 24
+
+spring:
+  application:
+    name: quickserve-cloud
+  datasource:
+    url: jdbc:postgresql://localhost:5432/quickserve_cloud
+    username: quickserve
+    password: quickserve
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
