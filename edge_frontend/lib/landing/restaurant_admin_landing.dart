@@ -6,7 +6,7 @@ import '../setup/edge_setup_api.dart';
 import '../widgets/staff_profile_banner.dart';
 import '../layout/floor_design_editor_screen.dart';
 import '../layout/floor_layout_terminal_screen.dart';
-import '../qr/product_option_wizard_screen.dart';
+import '../admin/product_options_admin_screen.dart';
 
 /// Restoran yöneticisi: menü / personel / masa düzeni — LAN Edge + isteğe bağlı Cloud.
 class RestaurantAdminLanding extends StatefulWidget {
@@ -54,11 +54,13 @@ class _RestaurantAdminLandingState extends State<RestaurantAdminLanding> {
 
   String _appBarTitle() {
     return switch (_tab) {
-      0 => 'Salon düzeni (terminal)',
-      1 => 'Tasarım editörü',
-      _ => 'QR ürün sihirbazı',
+      0 => 'Salon düzeni',
+      1 => 'Kat planı editörü',
+      _ => 'Ürün seçenekleri',
     };
   }
+
+  static const _navLabels = ['Salon', 'Kat planı', 'Seçenekler'];
 
   static String _wsHostPort(String edgeBaseUrl) {
     final u = Uri.parse(edgeBaseUrl);
@@ -103,38 +105,46 @@ class _RestaurantAdminLandingState extends State<RestaurantAdminLanding> {
                 auth: widget.auth,
                 roleLabel: 'RESTORAN YÖNETİCİSİ',
                 icon: Icons.admin_panel_settings_outlined,
-                subtitle: 'Salon, kat planı ve ürün seçenekleri bu cihazdaki Edge ile yönetilir.',
+                subtitle: 'Alt menüden Salon, Kat planı veya Seçenekler sekmesine geçin.',
               ),
             ),
-            ListTile(
-              leading: const Icon(Icons.table_restaurant),
-              title: const Text('Salon düzeni'),
-              selected: _tab == 0,
-              onTap: () {
-                setState(() => _tab = 0);
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.design_services_outlined),
-              title: const Text('Tasarım editörü'),
-              selected: _tab == 1,
-              onTap: () {
-                setState(() => _tab = 1);
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.qr_code_2),
-              title: const Text('QR ürün seçenekleri'),
-              selected: _tab == 2,
-              onTap: () {
-                setState(() => _tab = 2);
-                Navigator.pop(context);
-              },
-            ),
+            for (var i = 0; i < 3; i++)
+              ListTile(
+                leading: Icon(switch (i) {
+                  0 => Icons.table_restaurant,
+                  1 => Icons.design_services_outlined,
+                  _ => Icons.tune_outlined,
+                }),
+                title: Text(_navLabels[i]),
+                selected: _tab == i,
+                onTap: () {
+                  setState(() => _tab = i);
+                  Navigator.pop(context);
+                },
+              ),
           ],
         ),
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _tab,
+        onDestinationSelected: (i) => setState(() => _tab = i),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.table_restaurant_outlined),
+            selectedIcon: Icon(Icons.table_restaurant),
+            label: 'Salon',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.design_services_outlined),
+            selectedIcon: Icon(Icons.design_services),
+            label: 'Kat planı',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.tune_outlined),
+            selectedIcon: Icon(Icons.tune),
+            label: 'Seçenekler',
+          ),
+        ],
       ),
       body: IndexedStack(
         index: _tab,
@@ -148,11 +158,11 @@ class _RestaurantAdminLandingState extends State<RestaurantAdminLanding> {
             restaurantId: _effectiveRestaurantId,
             authToken: widget.auth.accessToken ?? '',
           ),
-          ProductOptionWizardScreen(
+          ProductOptionsAdminScreen(
             edgeBaseUrl: widget.edgeBaseUrl,
             authToken: widget.auth.accessToken ?? '',
             restaurantId: _effectiveRestaurantId,
-            productId: widget.demoProductId,
+            initialProductId: widget.demoProductId,
           ),
         ],
       ),
