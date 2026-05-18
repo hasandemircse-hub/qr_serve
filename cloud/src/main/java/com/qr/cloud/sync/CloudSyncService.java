@@ -1,5 +1,6 @@
 package com.qr.cloud.sync;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -75,6 +76,8 @@ public class CloudSyncService {
 
 	private final UserRepository userRepository;
 
+	private final Clock clock;
+
 	public CloudSyncService(
 			ObjectMapper objectMapper,
 			EdgeSyncCheckpointRepository checkpointRepository,
@@ -88,7 +91,8 @@ public class CloudSyncService {
 			RestaurantOrderRepository restaurantOrderRepository,
 			OrderLineItemRepository orderLineItemRepository,
 			PaymentRepository paymentRepository,
-			UserRepository userRepository) {
+			UserRepository userRepository,
+			Clock clock) {
 		this.objectMapper = objectMapper;
 		this.checkpointRepository = checkpointRepository;
 		this.syncEntityMergeService = syncEntityMergeService;
@@ -102,6 +106,7 @@ public class CloudSyncService {
 		this.orderLineItemRepository = orderLineItemRepository;
 		this.paymentRepository = paymentRepository;
 		this.userRepository = userRepository;
+		this.clock = clock;
 	}
 
 	@Transactional(readOnly = true)
@@ -113,7 +118,7 @@ public class CloudSyncService {
 
 	@Transactional
 	public void registerEdgeHello(EdgeHelloRequest request) {
-		LocalDateTime now = LocalDateTime.now();
+		LocalDateTime now = LocalDateTime.now(clock);
 		EdgeSyncCheckpoint checkpoint = checkpointRepository.findById(request.edgeId())
 				.orElseGet(() -> new EdgeSyncCheckpoint(request.edgeId(), EPOCH));
 		checkpoint.setPublicEdgeUrl(request.publicEdgeUrl());

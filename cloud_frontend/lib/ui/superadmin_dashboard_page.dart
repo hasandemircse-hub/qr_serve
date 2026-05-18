@@ -22,15 +22,29 @@ class _SuperadminDashboardPageState extends State<SuperadminDashboardPage> {
   void initState() {
     super.initState();
     _load();
+    _startAutoRefresh();
   }
 
-  Future<void> _load() async {
+  void _startAutoRefresh() {
+    Future<void> tick() async {
+      await Future<void>.delayed(const Duration(seconds: 30));
+      if (!mounted) return;
+      await _load(silent: true);
+      tick();
+    }
+
+    tick();
+  }
+
+  Future<void> _load({bool silent = false}) async {
     final token = widget.auth.accessToken;
     if (token == null) return;
-    setState(() {
-      _loadError = null;
-      _rows = null;
-    });
+    if (!silent) {
+      setState(() {
+        _loadError = null;
+        _rows = null;
+      });
+    }
     try {
       final list = await fetchRestaurants(
         cloudBaseUrl: AppConfig.cloudBaseUrl,
@@ -126,7 +140,18 @@ class _SuperadminDashboardPageState extends State<SuperadminDashboardPage> {
               ),
             ),
             const SizedBox(height: 20),
-            Text('Restoranlar', style: Theme.of(context).textTheme.titleLarge),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Restoranlar & Edge', style: Theme.of(context).textTheme.titleLarge),
+                Text(
+                  'Otomatik yenileme: 30 sn',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
             if (_loadError != null)
               Card(
@@ -174,6 +199,14 @@ class _RestaurantCard extends StatelessWidget {
 
   static const _statuses = ['DEMO', 'ACTIVE', 'FROZEN'];
 
+  Color _edgeStatusColor(ColorScheme scheme) {
+    return switch (r.edgeStatus) {
+      'ONLINE' => Colors.green.shade700,
+      'OFFLINE' => scheme.error,
+      _ => scheme.outline,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -209,6 +242,33 @@ class _RestaurantCard extends StatelessWidget {
                 Chip(label: Text(r.subscriptionStatus), visualDensity: VisualDensity.compact),
               ],
             ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Icon(Icons.hub_outlined, size: 18, color: _edgeStatusColor(scheme)),
+                const SizedBox(width: 6),
+                Chip(
+                  label: Text('Edge: ${r.edgeStatusLabel}'),
+                  visualDensity: VisualDensity.compact,
+                  backgroundColor: _edgeStatusColor(scheme).withValues(alpha: 0.12),
+                  labelStyle: TextStyle(color: _edgeStatusColor(scheme), fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+            if (r.edgeId != null) ...[
+              const SizedBox(height: 6),
+              Text('Edge ID: ${r.edgeId}', style: Theme.of(context).textTheme.bodySmall),
+            ],
+            if (r.publicEdgeUrl != null && r.publicEdgeUrl!.isNotEmpty) ...[
+              Text('URL: ${r.publicEdgeUrl}', style: Theme.of(context).textTheme.bodySmall),
+            ],
+            if (r.lastHelloAt != null)
+              Text('Son sinyal: ${r.lastHelloAt}', style: Theme.of(context).textTheme.bodySmall),
+            if (r.lastAcknowledgedUpdatedAt != null)
+              Text(
+                'Son sync ack: ${r.lastAcknowledgedUpdatedAt}',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+              ),
             const SizedBox(height: 12),
             Text('Abonelik', style: Theme.of(context).textTheme.labelLarge),
             const SizedBox(height: 8),

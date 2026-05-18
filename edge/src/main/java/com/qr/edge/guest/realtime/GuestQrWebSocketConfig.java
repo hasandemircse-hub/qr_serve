@@ -14,13 +14,17 @@ public class GuestQrWebSocketConfig implements WebSocketConfigurer {
 
 	private final WaiterPushWebSocketHandler waiterPushWebSocketHandler;
 
+	private final CashierPushWebSocketHandler cashierPushWebSocketHandler;
+
 	public GuestQrWebSocketConfig(
 			GuestMenuWebSocketHandler guestMenuWebSocketHandler,
 			KitchenPushWebSocketHandler kitchenPushWebSocketHandler,
-			WaiterPushWebSocketHandler waiterPushWebSocketHandler) {
+			WaiterPushWebSocketHandler waiterPushWebSocketHandler,
+			CashierPushWebSocketHandler cashierPushWebSocketHandler) {
 		this.guestMenuWebSocketHandler = guestMenuWebSocketHandler;
 		this.kitchenPushWebSocketHandler = kitchenPushWebSocketHandler;
 		this.waiterPushWebSocketHandler = waiterPushWebSocketHandler;
+		this.cashierPushWebSocketHandler = cashierPushWebSocketHandler;
 	}
 
 	@Override
@@ -28,5 +32,6 @@ public class GuestQrWebSocketConfig implements WebSocketConfigurer {
 		registry.addHandler(guestMenuWebSocketHandler, "/ws/v1/guest").setAllowedOriginPatterns("*");
 		registry.addHandler(kitchenPushWebSocketHandler, "/ws/v1/kitchen/push").setAllowedOriginPatterns("*");
 		registry.addHandler(waiterPushWebSocketHandler, "/ws/v1/waiter/push").setAllowedOriginPatterns("*");
+		registry.addHandler(cashierPushWebSocketHandler, "/ws/v1/cashier/push").setAllowedOriginPatterns("*");
 	}
 }

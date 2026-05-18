@@ -52,6 +52,7 @@ public class CashierOpenOrdersService {
 			rows.add(new CashierOpenOrderRow(
 					o.getId(),
 					s.orderNumber() != null ? s.orderNumber() : "",
+					o.getTableId(),
 					tableLabel,
 					o.getStatus(),
 					s.orderTotal(),

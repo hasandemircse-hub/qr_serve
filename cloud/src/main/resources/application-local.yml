@@ -1,4 +1,8 @@
 # Yerel geliştirme: PostgreSQL gerekmez. Çalıştırma: --spring.profiles.active=local
+quickserve:
+  admin:
+    edge-online-threshold-seconds: 180
+
 spring:
   datasource:
     url: jdbc:h2:mem:qs_cloud;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1

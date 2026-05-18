@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 String _root(String edgeBaseUrl) {
   final s = edgeBaseUrl.trim();
@@ -56,6 +58,62 @@ Future<WaiterMenuPayload> fetchWaiterMenu({
   }
   final map = jsonDecode(res.body) as Map<String, dynamic>;
   return WaiterMenuPayload.fromJson(map);
+}
+
+Future<List<WaiterReadyLineDto>> fetchWaiterReadyLines({
+  required String edgeBaseUrl,
+  required String? accessToken,
+}) async {
+  final uri = Uri.parse('${_root(edgeBaseUrl)}/api/v1/waiter/ready-lines');
+  final res = await http.get(uri, headers: _authHeaders(accessToken));
+  if (res.statusCode != 200) {
+    throw Exception('Hazır siparişler alınamadı (${res.statusCode})');
+  }
+  final map = jsonDecode(res.body) as Map<String, dynamic>;
+  final raw = map['lines'] as List<dynamic>? ?? [];
+  return raw.map((e) => WaiterReadyLineDto.fromJson(e as Map<String, dynamic>)).toList();
+}
+
+String waiterPushWebSocketUrl(String edgeBaseUrl, String restaurantId) {
+  final b = Uri.parse(edgeBaseUrl.trim());
+  final wsScheme = b.scheme == 'https' ? 'wss' : 'ws';
+  final sb = StringBuffer('$wsScheme://${b.host}');
+  if (b.hasPort) {
+    sb.write(':${b.port}');
+  }
+  sb.write('/ws/v1/waiter/push?restaurantId=${Uri.encodeQueryComponent(restaurantId)}');
+  return sb.toString();
+}
+
+class WaiterPushConnection {
+  WaiterPushConnection._(this._channel, this._subscription);
+
+  final WebSocketChannel _channel;
+  final StreamSubscription<dynamic> _subscription;
+
+  static WaiterPushConnection connect({
+    required String edgeBaseUrl,
+    required String restaurantId,
+    required void Function(String message) onMessage,
+    void Function(Object error)? onError,
+  }) {
+    final url = waiterPushWebSocketUrl(edgeBaseUrl, restaurantId);
+    final channel = WebSocketChannel.connect(Uri.parse(url));
+    final sub = channel.stream.listen(
+      (event) {
+        if (event is String) {
+          onMessage(event);
+        }
+      },
+      onError: onError,
+    );
+    return WaiterPushConnection._(channel, sub);
+  }
+
+  void dispose() {
+    _subscription.cancel();
+    _channel.sink.close();
+  }
 }
 
 Future<WaiterPlaceOrderResult> placeWaiterOrder({
@@ -161,6 +219,54 @@ class WaiterMenuProductDto {
       name: j['name'] as String? ?? '',
       description: j['description'] as String?,
       price: (j['price'] as num?)?.toDouble() ?? 0,
+    );
+  }
+}
+
+class WaiterReadyLineDto {
+  WaiterReadyLineDto({
+    required this.orderId,
+    required this.orderNumber,
+    required this.tableLabel,
+    required this.tableId,
+    required this.lineId,
+    required this.productName,
+    required this.quantity,
+    required this.kitchenLineStatus,
+  });
+
+  final String orderId;
+  final String orderNumber;
+  final String tableLabel;
+  final String tableId;
+  final String lineId;
+  final String productName;
+  final int quantity;
+  final String kitchenLineStatus;
+
+  factory WaiterReadyLineDto.fromJson(Map<String, dynamic> j) {
+    return WaiterReadyLineDto(
+      orderId: j['orderId'].toString(),
+      orderNumber: j['orderNumber'] as String? ?? '',
+      tableLabel: j['tableLabel'] as String? ?? '-',
+      tableId: j['tableId']?.toString() ?? '',
+      lineId: j['lineId'].toString(),
+      productName: j['productName'] as String? ?? '',
+      quantity: (j['quantity'] as num?)?.toInt() ?? 1,
+      kitchenLineStatus: j['kitchenLineStatus'] as String? ?? 'READY',
+    );
+  }
+
+  factory WaiterReadyLineDto.fromPush(Map<String, dynamic> j) {
+    return WaiterReadyLineDto(
+      orderId: j['orderId']?.toString() ?? '',
+      orderNumber: j['orderNumber'] as String? ?? '',
+      tableLabel: j['tableLabel'] as String? ?? '-',
+      tableId: j['tableId']?.toString() ?? '',
+      lineId: j['lineId']?.toString() ?? '',
+      productName: j['productName'] as String? ?? '',
+      quantity: (j['quantity'] as num?)?.toInt() ?? 1,
+      kitchenLineStatus: j['kitchenLineStatus'] as String? ?? 'READY',
     );
   }
 }

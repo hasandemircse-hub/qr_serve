@@ -25,16 +25,18 @@ public class AdminRestaurantController {
 
 	private final RestaurantRepository restaurantRepository;
 
-	public AdminRestaurantController(RestaurantRepository restaurantRepository) {
+	private final AdminEdgeMonitoringService adminEdgeMonitoringService;
+
+	public AdminRestaurantController(
+			RestaurantRepository restaurantRepository,
+			AdminEdgeMonitoringService adminEdgeMonitoringService) {
 		this.restaurantRepository = restaurantRepository;
+		this.adminEdgeMonitoringService = adminEdgeMonitoringService;
 	}
 
 	@GetMapping
-	public List<RestaurantSummaryDto> list() {
-		return restaurantRepository.findAll().stream()
-				.filter(r -> !Boolean.TRUE.equals(r.getIsDeleted()))
-				.map(r -> new RestaurantSummaryDto(r.getId(), r.getName(), r.getSubscriptionStatus()))
-				.toList();
+	public List<AdminRestaurantOverviewDto> list() {
+		return adminEdgeMonitoringService.restaurantOverview();
 	}
 
 	@PatchMapping("/{id}/subscription")

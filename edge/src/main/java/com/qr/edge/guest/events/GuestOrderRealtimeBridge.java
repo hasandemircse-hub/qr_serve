@@ -13,6 +13,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.qr.common.persistence.entity.KitchenLineStatus;
 import com.qr.common.persistence.entity.OrderLineItem;
 import com.qr.common.persistence.entity.RestaurantOrder;
 import com.qr.common.persistence.repository.GuestServiceRequestRepository;
@@ -20,6 +21,7 @@ import com.qr.common.persistence.repository.DiningTableRepository;
 import com.qr.common.persistence.repository.OrderLineItemRepository;
 import com.qr.common.persistence.repository.ProductRepository;
 import com.qr.common.persistence.repository.RestaurantOrderRepository;
+import com.qr.edge.guest.realtime.CashierPushSessionRegistry;
 import com.qr.edge.guest.realtime.GuestMenuSessionRegistry;
 import com.qr.edge.guest.realtime.KitchenPushSessionRegistry;
 import com.qr.edge.guest.realtime.WaiterPushSessionRegistry;
@@ -46,6 +48,8 @@ public class GuestOrderRealtimeBridge {
 
 	private final WaiterPushSessionRegistry waiterPushSessionRegistry;
 
+	private final CashierPushSessionRegistry cashierPushSessionRegistry;
+
 	private final GuestServiceRequestRepository guestServiceRequestRepository;
 
 	public GuestOrderRealtimeBridge(
@@ -57,6 +61,7 @@ public class GuestOrderRealtimeBridge {
 			KitchenPushSessionRegistry kitchenPushSessionRegistry,
 			GuestMenuSessionRegistry guestMenuSessionRegistry,
 			WaiterPushSessionRegistry waiterPushSessionRegistry,
+			CashierPushSessionRegistry cashierPushSessionRegistry,
 			GuestServiceRequestRepository guestServiceRequestRepository) {
 		this.objectMapper = objectMapper;
 		this.restaurantOrderRepository = restaurantOrderRepository;
@@ -66,7 +71,24 @@ public class GuestOrderRealtimeBridge {
 		this.kitchenPushSessionRegistry = kitchenPushSessionRegistry;
 		this.guestMenuSessionRegistry = guestMenuSessionRegistry;
 		this.waiterPushSessionRegistry = waiterPushSessionRegistry;
+		this.cashierPushSessionRegistry = cashierPushSessionRegistry;
 		this.guestServiceRequestRepository = guestServiceRequestRepository;
+	}
+
+	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+	@Async
+	public void onCashierRefresh(CashierRefreshEvent event) {
+		publishCashierRefresh(event.restaurantId());
+	}
+
+	private void publishCashierRefresh(UUID restaurantId) {
+		try {
+			ObjectNode node = objectMapper.createObjectNode();
+			node.put("type", "OPEN_ORDERS_REFRESH");
+			cashierPushSessionRegistry.broadcast(restaurantId, node.toString());
+		} catch (Exception ex) {
+			log.warn("Cashier refresh broadcast failed: {}", ex.getMessage());
+		}
 	}
 
 	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -90,6 +112,16 @@ public class GuestOrderRealtimeBridge {
 			String notes = order.getNotes();
 			kitchen.put("orderChannel", notes != null && !notes.isBlank() ? notes : "QR");
 			kitchenPushSessionRegistry.broadcast(order.getRestaurantId(), kitchen.toString());
+
+			ObjectNode cashier = objectMapper.createObjectNode();
+			cashier.put("type", "NEW_ORDER");
+			cashier.put("orderId", order.getId().toString());
+			cashier.put("orderNumber", order.getOrderNumber());
+			cashier.put("tableId", order.getTableId().toString());
+			cashier.put("tableLabel", tableLabel);
+			cashier.put("lineCount", lines.size());
+			cashier.put("orderChannel", notes != null && !notes.isBlank() ? notes : "QR");
+			cashierPushSessionRegistry.broadcast(order.getRestaurantId(), cashier.toString());
 
 			if (order.getGuestToken() == null || order.getGuestToken().isBlank()) {
 				return;
@@ -132,6 +164,12 @@ public class GuestOrderRealtimeBridge {
 				return;
 			}
 			if (order.getTableId() != null) {
+				String tableLabel = diningTableRepository.findById(order.getTableId())
+						.map(t -> t.getLabel())
+						.orElse("-");
+				String productName = productRepository.findById(line.getProductId())
+						.map(p -> p.getName())
+						.orElse("-");
 				ObjectNode kitchen = objectMapper.createObjectNode();
 				kitchen.put("type", "LINE_KITCHEN_STATUS");
 				kitchen.put("orderId", order.getId().toString());
@@ -139,6 +177,22 @@ public class GuestOrderRealtimeBridge {
 				kitchen.put("lineId", line.getId().toString());
 				kitchen.put("kitchenLineStatus", line.getKitchenLineStatus().name());
 				kitchenPushSessionRegistry.broadcast(order.getRestaurantId(), kitchen.toString());
+
+				ObjectNode waiter = objectMapper.createObjectNode();
+				waiter.put("type", "LINE_KITCHEN_STATUS");
+				waiter.put("orderId", order.getId().toString());
+				waiter.put("orderNumber", order.getOrderNumber() != null ? order.getOrderNumber() : "");
+				waiter.put("lineId", line.getId().toString());
+				waiter.put("kitchenLineStatus", line.getKitchenLineStatus().name());
+				waiter.put("tableId", order.getTableId().toString());
+				waiter.put("tableLabel", tableLabel);
+				waiter.put("productName", productName);
+				waiter.put("quantity", line.getQuantity());
+				waiterPushSessionRegistry.broadcast(order.getRestaurantId(), waiter.toString());
+
+				if (line.getKitchenLineStatus() == KitchenLineStatus.READY) {
+					log.debug("Waiter push: line ready order={} line={}", order.getId(), line.getId());
+				}
 			}
 			if (order.getGuestToken() == null || order.getGuestToken().isBlank() || order.getTableId() == null) {
 				return;

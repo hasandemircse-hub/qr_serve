@@ -32,6 +32,9 @@
 /Users/hasandemir/Desktop/projects/quickserve/common/src/main/java/com/qr/common/persistence/entity/RestaurantOrder.java
 /Users/hasandemir/Desktop/projects/quickserve/common/src/main/java/com/qr/common/persistence/entity/SyncMetadata.java
 /Users/hasandemir/Desktop/projects/quickserve/common/src/main/java/com/qr/common/persistence/entity/TableAvailabilityStatus.java
+/Users/hasandemir/Desktop/projects/quickserve/common/src/main/java/com/qr/common/persistence/entity/TableClosureAuditLog.java
+/Users/hasandemir/Desktop/projects/quickserve/common/src/main/java/com/qr/common/persistence/entity/TableClosurePolicy.java
+/Users/hasandemir/Desktop/projects/quickserve/common/src/main/java/com/qr/common/persistence/entity/TableClosureReasonCode.java
 /Users/hasandemir/Desktop/projects/quickserve/common/src/main/java/com/qr/common/persistence/entity/TableGuestToken.java
 /Users/hasandemir/Desktop/projects/quickserve/common/src/main/java/com/qr/common/persistence/entity/TableLayoutShape.java
 /Users/hasandemir/Desktop/projects/quickserve/common/src/main/java/com/qr/common/persistence/entity/User.java
@@ -47,6 +50,7 @@
 /Users/hasandemir/Desktop/projects/quickserve/common/src/main/java/com/qr/common/persistence/repository/ProductRepository.java
 /Users/hasandemir/Desktop/projects/quickserve/common/src/main/java/com/qr/common/persistence/repository/RestaurantOrderRepository.java
 /Users/hasandemir/Desktop/projects/quickserve/common/src/main/java/com/qr/common/persistence/repository/RestaurantRepository.java
+/Users/hasandemir/Desktop/projects/quickserve/common/src/main/java/com/qr/common/persistence/repository/TableClosureAuditLogRepository.java
 /Users/hasandemir/Desktop/projects/quickserve/common/src/main/java/com/qr/common/persistence/repository/TableGuestTokenRepository.java
 /Users/hasandemir/Desktop/projects/quickserve/common/src/main/java/com/qr/common/persistence/repository/UserRepository.java
 /Users/hasandemir/Desktop/projects/quickserve/common/src/main/java/com/qr/common/security/QrUserPrincipal.java

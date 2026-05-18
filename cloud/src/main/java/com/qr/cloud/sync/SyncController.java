@@ -1,5 +1,6 @@
 package com.qr.cloud.sync;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -28,8 +29,11 @@ public class SyncController {
 
 	private final CloudSyncService cloudSyncService;
 
-	public SyncController(CloudSyncService cloudSyncService) {
+	private final Clock clock;
+
+	public SyncController(CloudSyncService cloudSyncService, Clock clock) {
 		this.cloudSyncService = cloudSyncService;
+		this.clock = clock;
 	}
 
 	@GetMapping("/watermark")
@@ -45,7 +49,7 @@ public class SyncController {
 	@PostMapping("/edge/hello")
 	public EdgeHelloResponse edgeHello(@Valid @RequestBody EdgeHelloRequest body) {
 		cloudSyncService.registerEdgeHello(body);
-		return new EdgeHelloResponse(true, body.edgeId(), LocalDateTime.now(), "OK");
+		return new EdgeHelloResponse(true, body.edgeId(), LocalDateTime.now(clock), "OK");
 	}
 
 	@GetMapping("/bootstrap")

@@ -61,13 +61,11 @@ GoRouter createAppRouter({
       GoRoute(
         path: '/guest-lab',
         builder: (context, state) {
-          final rid = state.uri.queryParameters['restaurantId'] ??
+          final rid =
+              state.uri.queryParameters['restaurantId'] ??
               state.uri.queryParameters['r'] ??
               demoRestaurantId;
-          return GuestLabScreen(
-            edgeBaseUrl: edgeBaseUrl,
-            restaurantId: rid,
-          );
+          return GuestLabScreen(edgeBaseUrl: edgeBaseUrl, restaurantId: rid);
         },
       ),
       GoRoute(
@@ -86,10 +84,8 @@ GoRouter createAppRouter({
       ),
       GoRoute(
         path: '/login',
-        builder: (context, state) => LoginScreen(
-          auth: auth,
-          edgeBaseUrl: edgeBaseUrl,
-        ),
+        builder: (context, state) =>
+            LoginScreen(auth: auth, edgeBaseUrl: edgeBaseUrl),
       ),
       GoRoute(
         path: '/admin',
@@ -102,28 +98,23 @@ GoRouter createAppRouter({
       ),
       GoRoute(
         path: '/admin/setup',
-        builder: (context, state) => SetupWizardScreen(edgeBaseUrl: edgeBaseUrl),
+        builder: (context, state) =>
+            SetupWizardScreen(edgeBaseUrl: edgeBaseUrl),
       ),
       GoRoute(
         path: '/waiter',
-        builder: (context, state) => WaiterLanding(
-          auth: auth,
-          edgeBaseUrl: edgeBaseUrl,
-        ),
+        builder: (context, state) =>
+            WaiterLanding(auth: auth, edgeBaseUrl: edgeBaseUrl),
       ),
       GoRoute(
         path: '/kitchen',
-        builder: (context, state) => KitchenLanding(
-          auth: auth,
-          edgeBaseUrl: edgeBaseUrl,
-        ),
+        builder: (context, state) =>
+            KitchenLanding(auth: auth, edgeBaseUrl: edgeBaseUrl),
       ),
       GoRoute(
         path: '/cashier',
-        builder: (context, state) => CashierLanding(
-          auth: auth,
-          edgeBaseUrl: edgeBaseUrl,
-        ),
+        builder: (context, state) =>
+            CashierLanding(auth: auth, edgeBaseUrl: edgeBaseUrl),
       ),
       GoRoute(
         path: '/',
@@ -140,7 +131,7 @@ GoRouter createAppRouter({
 List<String> _pathsForRole(AppUserRole r) {
   switch (r) {
     case AppUserRole.restaurantAdmin:
-      return ['/admin', '/admin/setup'];
+      return ['/admin', '/admin/setup', '/cashier'];
     case AppUserRole.waiter:
       return ['/waiter'];
     case AppUserRole.kitchen:

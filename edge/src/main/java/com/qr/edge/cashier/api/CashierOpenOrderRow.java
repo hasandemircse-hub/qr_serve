@@ -8,6 +8,7 @@ import com.qr.common.persistence.entity.OrderStatus;
 public record CashierOpenOrderRow(
 		UUID orderId,
 		String orderNumber,
+		UUID tableId,
 		String tableLabel,
 		OrderStatus status,
 		BigDecimal orderTotal,

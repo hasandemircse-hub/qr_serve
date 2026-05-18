@@ -16,8 +16,11 @@ import org.springframework.web.server.ResponseStatusException;
 import com.qr.common.persistence.entity.DiningTable;
 import com.qr.common.persistence.repository.DiningTableRepository;
 import com.qr.common.security.QrUserPrincipal;
+import com.qr.common.persistence.entity.KitchenLineStatus;
 import com.qr.edge.guest.GuestMenuService;
 import com.qr.edge.guest.api.GuestMenuPayload;
+import com.qr.edge.kitchen.KitchenQueueService;
+import com.qr.edge.kitchen.api.KitchenQueuePayload;
 import com.qr.edge.qr.QrOrderService;
 import com.qr.edge.qr.api.CreateQrOrderRequest;
 import com.qr.edge.qr.api.CreateQrOrderResponse;
@@ -35,13 +38,17 @@ public class WaiterRestController {
 
 	private final QrOrderService qrOrderService;
 
+	private final KitchenQueueService kitchenQueueService;
+
 	public WaiterRestController(
 			DiningTableRepository diningTableRepository,
 			GuestMenuService guestMenuService,
-			QrOrderService qrOrderService) {
+			QrOrderService qrOrderService,
+			KitchenQueueService kitchenQueueService) {
 		this.diningTableRepository = diningTableRepository;
 		this.guestMenuService = guestMenuService;
 		this.qrOrderService = qrOrderService;
+		this.kitchenQueueService = kitchenQueueService;
 	}
 
 	@GetMapping("/tables")
@@ -62,6 +69,16 @@ public class WaiterRestController {
 	@PreAuthorize("hasAnyRole('WAITER','RESTAURANT_ADMIN')")
 	public GuestMenuPayload menu(@AuthenticationPrincipal QrUserPrincipal principal) {
 		return guestMenuService.menuForStaff(requireRestaurant(principal));
+	}
+
+	@GetMapping("/ready-lines")
+	@PreAuthorize("hasAnyRole('WAITER','RESTAURANT_ADMIN')")
+	public KitchenQueuePayload readyLines(@AuthenticationPrincipal QrUserPrincipal principal) {
+		UUID restaurantId = requireRestaurant(principal);
+		var ready = kitchenQueueService.buildQueue(restaurantId).lines().stream()
+				.filter(line -> line.kitchenLineStatus() == KitchenLineStatus.READY)
+				.toList();
+		return new KitchenQueuePayload(ready);
 	}
 
 	@PostMapping("/orders")

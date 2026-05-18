@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +42,7 @@ import com.qr.edge.billing.api.BillingSummaryResponse.PaymentSummary;
 import com.qr.edge.billing.api.ProcessPaymentRequest;
 import com.qr.edge.billing.api.ProcessPaymentRequest.LinePayRequest;
 import com.qr.edge.billing.fiscal.FiscalComplianceService;
+import com.qr.edge.guest.events.CashierRefreshEvent;
 import com.qr.edge.print.ThermalEscPosPrintService;
 import com.qr.edge.print.billing.AdisyonSlipModel;
 import com.qr.edge.print.billing.AdisyonSlipModel.LineEntry;
@@ -74,6 +76,10 @@ public class BillingPaymentService {
 
 	private final java.time.Clock clock;
 
+	private final TableClosureService tableClosureService;
+
+	private final ApplicationEventPublisher eventPublisher;
+
 	public BillingPaymentService(
 			RestaurantOrderRepository restaurantOrderRepository,
 			OrderLineItemRepository orderLineItemRepository,
@@ -85,7 +91,9 @@ public class BillingPaymentService {
 			PosTerminalGateway posTerminalGateway,
 			ThermalEscPosPrintService thermalEscPosPrintService,
 			ObjectMapper objectMapper,
-			java.time.Clock clock) {
+			java.time.Clock clock,
+			TableClosureService tableClosureService,
+			ApplicationEventPublisher eventPublisher) {
 		this.restaurantOrderRepository = restaurantOrderRepository;
 		this.orderLineItemRepository = orderLineItemRepository;
 		this.paymentRepository = paymentRepository;
@@ -97,6 +105,8 @@ public class BillingPaymentService {
 		this.thermalEscPosPrintService = thermalEscPosPrintService;
 		this.objectMapper = objectMapper;
 		this.clock = clock;
+		this.tableClosureService = tableClosureService;
+		this.eventPublisher = eventPublisher;
 	}
 
 	@Transactional(readOnly = true)
@@ -196,6 +206,10 @@ public class BillingPaymentService {
 			order.setStatus(OrderStatus.CLOSED);
 		}
 		restaurantOrderRepository.save(order);
+		if (order.getStatus() == OrderStatus.CLOSED && order.getTableId() != null) {
+			tableClosureService.tryReleaseTableIfIdle(restaurantId, order.getTableId());
+		}
+		eventPublisher.publishEvent(new CashierRefreshEvent(restaurantId));
 		String allocationJson = payment.getAllocationDetailsJson();
 		List<FiscalLineSnapshot> fiscalLines = buildFiscalSnapshots(lines, allocations);
 		fiscalComplianceService.recordAdisyonAttempt(restaurantId, order, payment, fiscalLines, allocationJson);

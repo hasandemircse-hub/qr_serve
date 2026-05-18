@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
+import '../auth/app_user_role.dart';
 import '../auth/auth_session.dart';
 import '../billing/edge_cashier_api.dart';
 import '../widgets/staff_profile_banner.dart';
@@ -25,24 +28,61 @@ class _CashierLandingState extends State<CashierLanding> {
   List<CashierOpenOrderDto> _orders = [];
   Object? _loadError;
   bool _loading = true;
+  CashierPushConnection? _push;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    await _load(silent: false);
+    final rid = widget.auth.restaurantId;
+    if (rid != null && rid.isNotEmpty) {
+      try {
+        _push = CashierPushConnection.connect(
+          edgeBaseUrl: widget.edgeBaseUrl,
+          restaurantId: rid,
+          onMessage: _onPushMessage,
+        );
+      } catch (_) {
+        // WS isteğe bağlı; REST çalışır
+      }
+    }
+  }
+
+  void _onPushMessage(String raw) {
+    try {
+      final map = jsonDecode(raw) as Map<String, dynamic>;
+      final t = map['type'] as String?;
+      if (t == 'NEW_ORDER' || t == 'OPEN_ORDERS_REFRESH') {
+        _load(silent: true);
+        if (t == 'NEW_ORDER' && mounted) {
+          final table = map['tableLabel'] as String? ?? '-';
+          final no = map['orderNumber'] as String? ?? '';
+          _toast('Yeni adisyon: Masa $table ${no.isNotEmpty ? '($no)' : ''}');
+        }
+      }
+    } catch (_) {
+      // yut
+    }
   }
 
   @override
   void dispose() {
+    _push?.dispose();
     _search.dispose();
     super.dispose();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _loadError = null;
-    });
+  Future<void> _load({bool silent = false}) async {
+    if (!silent && mounted) {
+      setState(() {
+        _loading = true;
+        _loadError = null;
+      });
+    }
     try {
       final list = await fetchCashierOpenOrders(
         edgeBaseUrl: widget.edgeBaseUrl,
@@ -108,6 +148,129 @@ class _CashierLandingState extends State<CashierLanding> {
     );
   }
 
+  Future<void> _closeTable(CashierOpenOrderDto order) async {
+    if (order.tableId.isEmpty) {
+      _toast('Bu adisyonda masa bilgisi yok.');
+      return;
+    }
+    try {
+      final res = await closeTableSession(
+        edgeBaseUrl: widget.edgeBaseUrl,
+        accessToken: widget.auth.accessToken,
+        tableId: order.tableId,
+      );
+      if (!mounted) return;
+      _toast(
+        res.tableReleased
+            ? 'Masa ${res.tableLabel} boşaltıldı.'
+            : 'Adisyonlar kapatıldı; masada başka açık hesap olabilir.',
+      );
+      await _load();
+    } catch (e) {
+      if (mounted) _toast('$e');
+    }
+  }
+
+  Future<void> _forceCloseTable(
+    CashierOpenOrderDto order,
+    BillingSummaryDto summary,
+  ) async {
+    if (order.tableId.isEmpty) {
+      _toast('Bu adisyonda masa bilgisi yok.');
+      return;
+    }
+    final noteCtrl = TextEditingController();
+    var reasonCode = 'MANAGER_FORCE_CLOSE';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Bakiyeli masayı kapat'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Kalan bakiye: ${summary.remainingPrincipal.toStringAsFixed(2)} ₺',
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: reasonCode,
+                  decoration: const InputDecoration(
+                    labelText: 'Sebep',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'MANAGER_FORCE_CLOSE',
+                      child: Text('Yönetici kararı'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'GUEST_LEFT',
+                      child: Text('Misafir ayrıldı'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'STAFF_ERROR',
+                      child: Text('Personel hatası'),
+                    ),
+                    DropdownMenuItem(value: 'OTHER', child: Text('Diğer')),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) setDialogState(() => reasonCode = v);
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: noteCtrl,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Not',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Vazgeç'),
+            ),
+            FilledButton.tonal(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Zorla kapat'),
+            ),
+          ],
+        ),
+      ),
+    );
+    final note = noteCtrl.text.trim();
+    noteCtrl.dispose();
+    if (confirmed != true) return;
+    try {
+      final res = await closeTableSession(
+        edgeBaseUrl: widget.edgeBaseUrl,
+        accessToken: widget.auth.accessToken,
+        tableId: order.tableId,
+        body: {
+          'policy': 'FORCE_CLOSE_UNPAID',
+          'reasonCode': reasonCode,
+          'note': note.isEmpty ? null : note,
+        },
+      );
+      if (!mounted) return;
+      _toast(
+        res.tableReleased
+            ? 'Masa ${res.tableLabel} zorla kapatıldı.'
+            : 'Adisyon kapatıldı; masada başka açık hesap olabilir.',
+      );
+      await _load();
+    } catch (e) {
+      if (mounted) _toast('$e');
+    }
+  }
+
   Future<void> _openDetail(CashierOpenOrderDto order) async {
     final rid = _restaurantId;
     if (rid == null || rid.isEmpty) {
@@ -125,7 +288,9 @@ class _CashierLandingState extends State<CashierLanding> {
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: Text(order.orderNumber.isNotEmpty ? order.orderNumber : order.orderId),
+          title: Text(
+            order.orderNumber.isNotEmpty ? order.orderNumber : order.orderId,
+          ),
           content: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -150,7 +315,28 @@ class _CashierLandingState extends State<CashierLanding> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Kapat')),
+            if (order.tableId.isNotEmpty && s.remainingPrincipal <= 0.001)
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _closeTable(order);
+                },
+                child: const Text('Masayı kapat'),
+              ),
+            if (order.tableId.isNotEmpty &&
+                s.remainingPrincipal > 0.001 &&
+                widget.auth.role == AppUserRole.restaurantAdmin)
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _forceCloseTable(order, s);
+                },
+                child: const Text('Zorla kapat'),
+              ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Kapat'),
+            ),
             FilledButton(
               onPressed: () {
                 Navigator.pop(ctx);
@@ -170,7 +356,10 @@ class _CashierLandingState extends State<CashierLanding> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final filtered = _filtered();
-    final sumRemaining = filtered.fold<double>(0, (s, o) => s + o.remainingPrincipal);
+    final sumRemaining = filtered.fold<double>(
+      0,
+      (s, o) => s + o.remainingPrincipal,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -205,7 +394,8 @@ class _CashierLandingState extends State<CashierLanding> {
             auth: widget.auth,
             roleLabel: 'KASA',
             icon: Icons.point_of_sale_outlined,
-            subtitle: 'Açık bakiyeler Edge’den; kalan tutarı REMAINDER ile tahsil edin.',
+            subtitle:
+                'Açık bakiyeler Edge’den; kalan tutarı REMAINDER ile tahsil edin.',
           ),
           if (_loadError != null) ...[
             const SizedBox(height: 12),
@@ -248,9 +438,9 @@ class _CashierLandingState extends State<CashierLanding> {
               ),
               Text(
                 'Kalan ${sumRemaining.toStringAsFixed(2)} ₺',
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: scheme.primary,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.labelLarge?.copyWith(color: scheme.primary),
               ),
             ],
           ),
@@ -278,11 +468,16 @@ class _CashierLandingState extends State<CashierLanding> {
               return Card(
                 margin: const EdgeInsets.only(bottom: 10),
                 child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   leading: CircleAvatar(
                     backgroundColor: scheme.secondaryContainer,
                     child: Text(
-                      o.tableLabel.length > 3 ? o.tableLabel.substring(0, 3) : o.tableLabel,
+                      o.tableLabel.length > 3
+                          ? o.tableLabel.substring(0, 3)
+                          : o.tableLabel,
                       style: TextStyle(
                         color: scheme.onSecondaryContainer,
                         fontWeight: FontWeight.bold,
@@ -290,7 +485,9 @@ class _CashierLandingState extends State<CashierLanding> {
                       ),
                     ),
                   ),
-                  title: Text('${o.remainingPrincipal.toStringAsFixed(2)} ₺ kalan'),
+                  title: Text(
+                    '${o.remainingPrincipal.toStringAsFixed(2)} ₺ kalan',
+                  ),
                   subtitle: Text(
                     '${o.lineCount} kalem · ${o.orderNumber.isNotEmpty ? o.orderNumber : o.orderId} · ${o.status}',
                   ),
@@ -323,12 +520,14 @@ class _CashierLandingState extends State<CashierLanding> {
                 label: const Text('İade'),
               ),
               FilledButton.tonalIcon(
-                onPressed: () => _toast('Ödeme ekranından Nakit veya Kart seçin.'),
+                onPressed: () =>
+                    _toast('Ödeme ekranından Nakit veya Kart seçin.'),
                 icon: const Icon(Icons.payments_outlined),
                 label: const Text('Nakit'),
               ),
               FilledButton.tonalIcon(
-                onPressed: () => _toast('Ödeme ekranından Nakit veya Kart seçin.'),
+                onPressed: () =>
+                    _toast('Ödeme ekranından Nakit veya Kart seçin.'),
                 icon: const Icon(Icons.credit_card),
                 label: const Text('Kart'),
               ),
@@ -388,7 +587,7 @@ class _CashierPaySheetState extends State<_CashierPaySheet> {
     setState(() => _submitting = true);
     try {
       final body = buildRemainderPaymentBody(method: _method, tipAmount: tip);
-      await postBillingPayment(
+      final result = await postBillingPayment(
         edgeBaseUrl: widget.edgeBaseUrl,
         accessToken: widget.accessToken,
         restaurantId: widget.restaurantId,
@@ -396,10 +595,30 @@ class _CashierPaySheetState extends State<_CashierPaySheet> {
         body: body,
       );
       if (!mounted) return;
+      if (result.orderStatus == 'CLOSED' &&
+          widget.order.tableId.isNotEmpty &&
+          result.remainingPrincipalAfter <= 0.001) {
+        try {
+          final closed = await closeTableSession(
+            edgeBaseUrl: widget.edgeBaseUrl,
+            accessToken: widget.accessToken,
+            tableId: widget.order.tableId,
+          );
+          if (mounted && closed.tableReleased) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Masa ${closed.tableLabel} boşaltıldı.')),
+            );
+          }
+        } catch (_) {
+          // Ödeme başarılı; masa kapatma isteğe bağlı
+        }
+      }
       widget.onPaid();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
       }
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -438,7 +657,9 @@ class _CashierPaySheetState extends State<_CashierPaySheet> {
                         : 'Adisyon',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
-                  Text('Masa ${widget.order.tableLabel} · Kalan ${s.remainingPrincipal.toStringAsFixed(2)} ₺'),
+                  Text(
+                    'Masa ${widget.order.tableLabel} · Kalan ${s.remainingPrincipal.toStringAsFixed(2)} ₺',
+                  ),
                   const SizedBox(height: 12),
                   for (final l in s.lines)
                     if (l.remainingOnLine > 0.001)
@@ -446,12 +667,16 @@ class _CashierPaySheetState extends State<_CashierPaySheet> {
                         dense: true,
                         contentPadding: EdgeInsets.zero,
                         title: Text('${l.productName} × ${l.quantity}'),
-                        trailing: Text('${l.remainingOnLine.toStringAsFixed(2)} ₺'),
+                        trailing: Text(
+                          '${l.remainingOnLine.toStringAsFixed(2)} ₺',
+                        ),
                       ),
                   const Divider(),
                   TextField(
                     controller: _tipCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     decoration: const InputDecoration(
                       labelText: 'Bahşiş (₺)',
                       border: OutlineInputBorder(),
@@ -460,22 +685,35 @@ class _CashierPaySheetState extends State<_CashierPaySheet> {
                   const SizedBox(height: 12),
                   SegmentedButton<String>(
                     segments: const [
-                      ButtonSegment(value: 'CASH', label: Text('Nakit'), icon: Icon(Icons.payments_outlined)),
-                      ButtonSegment(value: 'CARD', label: Text('Kart'), icon: Icon(Icons.credit_card)),
+                      ButtonSegment(
+                        value: 'CASH',
+                        label: Text('Nakit'),
+                        icon: Icon(Icons.payments_outlined),
+                      ),
+                      ButtonSegment(
+                        value: 'CARD',
+                        label: Text('Kart'),
+                        icon: Icon(Icons.credit_card),
+                      ),
                     ],
                     selected: {_method},
-                    onSelectionChanged: (v) => setState(() => _method = v.first),
+                    onSelectionChanged: (v) =>
+                        setState(() => _method = v.first),
                   ),
                   const SizedBox(height: 16),
                   FilledButton(
-                    onPressed: s.remainingPrincipal <= 0 || _submitting ? null : _pay,
+                    onPressed: s.remainingPrincipal <= 0 || _submitting
+                        ? null
+                        : _pay,
                     child: _submitting
                         ? const SizedBox(
                             height: 22,
                             width: 22,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Text('Kalanı tahsil et (${s.remainingPrincipal.toStringAsFixed(2)} ₺)'),
+                        : Text(
+                            'Kalanı tahsil et (${s.remainingPrincipal.toStringAsFixed(2)} ₺)',
+                          ),
                   ),
                 ],
               ),
