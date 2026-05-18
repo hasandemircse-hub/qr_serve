@@ -55,7 +55,7 @@
 |-----|--------|-----|
 | Garson | **Kısmen** | Masa→menü→sepet→sipariş; **seçenekli ürün** (option-wizard). Hazır satır: `GET …/waiter/ready-lines` + WS push. |
 | Mutfak | **Kısmen** | Kuyruk + received/ready + mutfak WS; `LINE_KITCHEN_STATUS` garsona da push. |
-| Kasiyer | **Kısmen** | Açık adisyon + ödeme + kasa WS; **Masayı kapat** yalnızca bakiye sıfırken (`TableClosureService`). Kısmi ödeme / iade UI **yok**. |
+| Kasiyer | **Kısmen** | Açık adisyon + ödeme + kasa WS; **Masayı kapat** standartta bakiye sıfırken, admin force-close başlangıcı var. Kısmi tutar ödeme UI tamam; iade UI yok. |
 
 ### D. Müşteri (QR)
 
@@ -90,7 +90,7 @@
 | QR → oturum / masa | **Kısmen** | Token + session API; Flutter lab ile toplu masa testi. |
 | Sepet → onay → mutfak | **Kısmen** | Edge’de sipariş + mutfak WS + `kitchen_landing` gerçek kuyruk. Tam otomasyon (sipariş kapanışı, mutfak dışı roller) **kısmen**. |
 | Alındı / hazır bildirimleri | **Kısmen** | Mutfak + misafir WS; garson hazır paneli + push. |
-| Ödeme (ürün/tutar/toplam, bahşiş) | **Kısmen** | `BillingPaymentService` + kasa UI: kalan tahsilat + bahşiş. Parçalı satır ödemesi / fatura entegrasyonu **kısmen**. |
+| Ödeme (ürün/tutar/toplam, bahşiş) | **Kısmen** | `BillingPaymentService` + kasa UI: kalan tahsilat, belirli tutar tahsilatı ve bahşiş. Satır bazlı ödeme UI / fatura entegrasyonu **kısmen**. |
 | Masa kapanışı | **Kısmen** | `POST /api/v1/cashier/tables/{tableId}/close-session`; standart akışta tüm açık siparişlerde `remainingPrincipal <= 0` şartı. v2 başlangıcı: admin için `FORCE_CLOSE_UNPAID` + reason/note + audit log. |
 
 ### 3.1 Masa kapat — mevcut ve gelecek senaryolar
@@ -164,11 +164,11 @@
 
 1. ~~Garson: masa → menü → sepet → Edge sipariş API.~~ *(Edge API + `waiter_landing` temel akış tamam; seçenekli ürün / harita sonraki.)*  
 2. ~~Mutfak: gerçek kuyruk + durum butonları + (isteğe bağlı) WS.~~ *(Temel kuyruk + butonlar + WS yenileme tamam; garson push / servis çıkışı API sonraki.)*  
-3. ~~Kasa: açık adisyon + `BillingController` ile ödeme.~~ *(Açık liste API + `cashier_landing` kalan tahsilat; kısmi/iade sonraki.)*  
+3. ~~Kasa: açık adisyon + `BillingController` ile ödeme.~~ *(Açık liste API + `cashier_landing` kalan tahsilat ve belirli tutar tahsilatı; satır bazlı ödeme/iade sonraki.)*  
 4. Misafir: Flutter `edge_frontend` `/guest-lab` + `/guest/qr` + Edge guest option-wizard; **Cloud public misafir BFF** ve internet QR yönlendirmesi sonraki sprint. Statik `/guest` yedek.  
 5. ~~Cloud: Edge listesi / last seen API + `cloud_frontend` ekranı.~~ *(Temel panel tamam; eşik/heartbeat ayarı ve edge-id’siz restoranlar için ayrı liste isteğe bağlı.)*  
 6. **Masa kapat v2:** Force close + audit başlangıcı tamam; sırada bakiye sınıflandırması (`VOID` / `WRITE_OFF`), deferred balance ve raporlama.  
-7. Cloud: restoran **oluşturma** (POST) süperadmin için.
+7. ~~Cloud: restoran **oluşturma** (POST) süperadmin için.~~ *(Backend `POST /api/v1/admin/restaurants` + `cloud_frontend` form tamam.)*
 
 *(Öncelik ürün kararına göre değiştirilir; değişince bu bölümü güncelleyin.)*
 
@@ -178,6 +178,8 @@
 
 | Tarih | Özet | Modül |
 |-------|------|--------|
+| 2026-05-18 | Kasa kısmi ödeme UI: ödeme sheet’inde `REMAINDER` / `FIXED_AMOUNT` seçimi, tutar validasyonu ve backend `FIXED_AMOUNT` ödeme gövdesi. | edge_frontend, docs |
+| 2026-05-18 | Cloud süperadmin restoran oluşturma: `POST /api/v1/admin/restaurants`, validasyonlu create request, `cloud_frontend` “Restoran ekle” diyaloğu; yeni restoran `NEVER_SEEN` Edge durumu ile listelenir. | cloud, cloud_frontend, docs |
 | 2026-05-18 | Masa kapat v2 başlangıcı: `TableClosurePolicy`, `TableClosureReasonCode`, `table_closure_audit_logs`; admin için açık bakiyeli `FORCE_CLOSE_UNPAID` akışı ve kasa UI’da reason/note diyaloğu. | common, edge, edge_frontend, docs |
 | 2026-05-15 | Cloud süperadmin: restoran listesine Edge durumu (`AdminEdgeMonitoringService`, `edgeStatus`, son hello/URL); `cloud_frontend` kartlar + 30 sn yenileme. Edge: `EdgeHeartbeatScheduler` periyodik hello. Plan: § 3.1 ödeme öncesi masa kapat senaryoları. | cloud, edge, cloud_frontend, docs |
 | 2026-05-15 | Masa kapanışı (bakiye=0): `TableClosureService`, `POST …/cashier/tables/{id}/close-session`; kasa WS yenileme. Garson seçenekli ürün + admin seçenek CRUD. Garson hazır bildirimi (`ready-lines`, waiter WS). | edge, edge_frontend, common, docs |

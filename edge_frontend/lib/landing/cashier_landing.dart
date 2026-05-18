@@ -561,7 +561,9 @@ class _CashierPaySheet extends StatefulWidget {
 class _CashierPaySheetState extends State<_CashierPaySheet> {
   late Future<BillingSummaryDto> _summaryFuture;
   final _tipCtrl = TextEditingController(text: '0');
+  final _amountCtrl = TextEditingController();
   String _method = 'CASH';
+  String _paymentMode = 'REMAINDER';
   bool _submitting = false;
 
   @override
@@ -578,15 +580,37 @@ class _CashierPaySheetState extends State<_CashierPaySheet> {
   @override
   void dispose() {
     _tipCtrl.dispose();
+    _amountCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _pay() async {
+  Future<void> _pay(BillingSummaryDto summary) async {
     final tip = double.tryParse(_tipCtrl.text.replaceAll(',', '.')) ?? 0;
     if (tip < 0) return;
+    final fixedAmount = double.tryParse(_amountCtrl.text.replaceAll(',', '.'));
+    if (_paymentMode == 'FIXED_AMOUNT') {
+      if (fixedAmount == null || fixedAmount <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tahsil edilecek tutarı girin.')),
+        );
+        return;
+      }
+      if (fixedAmount > summary.remainingPrincipal + 0.001) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tutar kalan bakiyeyi aşamaz.')),
+        );
+        return;
+      }
+    }
     setState(() => _submitting = true);
     try {
-      final body = buildRemainderPaymentBody(method: _method, tipAmount: tip);
+      final body = _paymentMode == 'FIXED_AMOUNT'
+          ? buildFixedAmountPaymentBody(
+              method: _method,
+              fixedAmount: fixedAmount!,
+              tipAmount: tip,
+            )
+          : buildRemainderPaymentBody(method: _method, tipAmount: tip);
       final result = await postBillingPayment(
         edgeBaseUrl: widget.edgeBaseUrl,
         accessToken: widget.accessToken,
@@ -661,6 +685,38 @@ class _CashierPaySheetState extends State<_CashierPaySheet> {
                     'Masa ${widget.order.tableLabel} · Kalan ${s.remainingPrincipal.toStringAsFixed(2)} ₺',
                   ),
                   const SizedBox(height: 12),
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(
+                        value: 'REMAINDER',
+                        label: Text('Tamamı'),
+                        icon: Icon(Icons.done_all_outlined),
+                      ),
+                      ButtonSegment(
+                        value: 'FIXED_AMOUNT',
+                        label: Text('Tutar'),
+                        icon: Icon(Icons.payments_outlined),
+                      ),
+                    ],
+                    selected: {_paymentMode},
+                    onSelectionChanged: _submitting
+                        ? null
+                        : (v) => setState(() => _paymentMode = v.first),
+                  ),
+                  if (_paymentMode == 'FIXED_AMOUNT') ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _amountCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'Tahsil edilecek tutar (₺)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
                   for (final l in s.lines)
                     if (l.remainingOnLine > 0.001)
                       ListTile(
@@ -704,7 +760,7 @@ class _CashierPaySheetState extends State<_CashierPaySheet> {
                   FilledButton(
                     onPressed: s.remainingPrincipal <= 0 || _submitting
                         ? null
-                        : _pay,
+                        : () => _pay(s),
                     child: _submitting
                         ? const SizedBox(
                             height: 22,
@@ -712,7 +768,9 @@ class _CashierPaySheetState extends State<_CashierPaySheet> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : Text(
-                            'Kalanı tahsil et (${s.remainingPrincipal.toStringAsFixed(2)} ₺)',
+                            _paymentMode == 'FIXED_AMOUNT'
+                                ? 'Tutarı tahsil et'
+                                : 'Kalanı tahsil et (${s.remainingPrincipal.toStringAsFixed(2)} ₺)',
                           ),
                   ),
                 ],

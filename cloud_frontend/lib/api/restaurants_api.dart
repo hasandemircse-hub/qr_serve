@@ -37,10 +37,10 @@ class RestaurantSummary {
   }
 
   String get edgeStatusLabel => switch (edgeStatus) {
-        'ONLINE' => 'Çevrimiçi',
-        'OFFLINE' => 'Çevrimdışı',
-        _ => 'Kayıt yok',
-      };
+    'ONLINE' => 'Çevrimiçi',
+    'OFFLINE' => 'Çevrimdışı',
+    _ => 'Kayıt yok',
+  };
 }
 
 String? _dateToString(dynamic v) {
@@ -66,7 +66,9 @@ Future<List<RestaurantSummary>> fetchRestaurants({
   required String cloudBaseUrl,
   required String accessToken,
 }) async {
-  final root = cloudBaseUrl.endsWith('/') ? cloudBaseUrl.substring(0, cloudBaseUrl.length - 1) : cloudBaseUrl;
+  final root = cloudBaseUrl.endsWith('/')
+      ? cloudBaseUrl.substring(0, cloudBaseUrl.length - 1)
+      : cloudBaseUrl;
   final uri = Uri.parse('$root/api/v1/admin/restaurants');
   final res = await http.get(
     uri,
@@ -79,7 +81,43 @@ Future<List<RestaurantSummary>> fetchRestaurants({
     throw Exception('Liste (${res.statusCode}): ${res.body}');
   }
   final list = jsonDecode(res.body) as List<dynamic>;
-  return list.map((e) => RestaurantSummary.fromJson(e as Map<String, dynamic>)).toList();
+  return list
+      .map((e) => RestaurantSummary.fromJson(e as Map<String, dynamic>))
+      .toList();
+}
+
+Future<RestaurantSummary> createRestaurant({
+  required String cloudBaseUrl,
+  required String accessToken,
+  required String name,
+  required String? legalName,
+  required String? taxId,
+  required String subscriptionStatus,
+}) async {
+  final root = cloudBaseUrl.endsWith('/')
+      ? cloudBaseUrl.substring(0, cloudBaseUrl.length - 1)
+      : cloudBaseUrl;
+  final uri = Uri.parse('$root/api/v1/admin/restaurants');
+  final res = await http.post(
+    uri,
+    headers: {
+      'Authorization': 'Bearer $accessToken',
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: jsonEncode({
+      'name': name,
+      'legalName': legalName,
+      'taxId': taxId,
+      'subscriptionStatus': subscriptionStatus,
+    }),
+  );
+  if (res.statusCode != 200) {
+    throw Exception('Oluşturma (${res.statusCode}): ${res.body}');
+  }
+  return RestaurantSummary.fromJson(
+    jsonDecode(res.body) as Map<String, dynamic>,
+  );
 }
 
 Future<void> patchRestaurantSubscription({
@@ -88,8 +126,12 @@ Future<void> patchRestaurantSubscription({
   required String restaurantId,
   required String subscriptionStatus,
 }) async {
-  final root = cloudBaseUrl.endsWith('/') ? cloudBaseUrl.substring(0, cloudBaseUrl.length - 1) : cloudBaseUrl;
-  final uri = Uri.parse('$root/api/v1/admin/restaurants/$restaurantId/subscription');
+  final root = cloudBaseUrl.endsWith('/')
+      ? cloudBaseUrl.substring(0, cloudBaseUrl.length - 1)
+      : cloudBaseUrl;
+  final uri = Uri.parse(
+    '$root/api/v1/admin/restaurants/$restaurantId/subscription',
+  );
   final res = await http.patch(
     uri,
     headers: {

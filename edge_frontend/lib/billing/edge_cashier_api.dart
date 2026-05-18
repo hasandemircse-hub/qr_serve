@@ -131,6 +131,22 @@ Map<String, dynamic> buildRemainderPaymentBody({
   };
 }
 
+Map<String, dynamic> buildFixedAmountPaymentBody({
+  required String method,
+  required double fixedAmount,
+  double tipAmount = 0,
+}) {
+  return {
+    'mode': 'FIXED_AMOUNT',
+    'fixedAmount': fixedAmount,
+    'linePayments': null,
+    'method': method,
+    'tipAmount': tipAmount,
+    'externalReference': null,
+    'printToPrinterId': null,
+  };
+}
+
 Future<CloseTableSessionResultDto> closeTableSession({
   required String edgeBaseUrl,
   required String? accessToken,
