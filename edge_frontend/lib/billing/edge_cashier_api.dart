@@ -61,6 +61,20 @@ class CashierPushConnection {
   }
 }
 
+Future<ClosureBalanceReportDto> fetchClosureBalanceReport({
+  required String edgeBaseUrl,
+  required String? accessToken,
+}) async {
+  final uri = Uri.parse('${_root(edgeBaseUrl)}/api/v1/cashier/balance-report');
+  final res = await http.get(uri, headers: _authHeaders(accessToken));
+  if (res.statusCode != 200) {
+    throw Exception('Bakiye raporu alınamadı (${res.statusCode})');
+  }
+  return ClosureBalanceReportDto.fromJson(
+    jsonDecode(res.body) as Map<String, dynamic>,
+  );
+}
+
 Future<List<CashierOpenOrderDto>> fetchCashierOpenOrders({
   required String edgeBaseUrl,
   required String? accessToken,
@@ -92,6 +106,32 @@ Future<BillingSummaryDto> fetchBillingSummary({
   }
   final map = jsonDecode(res.body) as Map<String, dynamic>;
   return BillingSummaryDto.fromJson(map);
+}
+
+Future<BillingRefundResultDto> postBillingRefund({
+  required String edgeBaseUrl,
+  required String? accessToken,
+  required String restaurantId,
+  required String orderId,
+  required String paymentId,
+  String? note,
+}) async {
+  final uri = Uri.parse(
+    '${_root(edgeBaseUrl)}/api/v1/restaurants/$restaurantId/orders/$orderId/billing/payments/$paymentId/refund',
+  );
+  final res = await http.post(
+    uri,
+    headers: _authHeaders(accessToken),
+    body: jsonEncode(
+      note != null && note.isNotEmpty ? {'note': note} : <String, dynamic>{},
+    ),
+  );
+  if (res.statusCode != 200) {
+    throw Exception('İade başarısız (${res.statusCode}): ${res.body}');
+  }
+  return BillingRefundResultDto.fromJson(
+    jsonDecode(res.body) as Map<String, dynamic>,
+  );
 }
 
 Future<BillingPaymentResultDto> postBillingPayment({
@@ -147,6 +187,23 @@ Map<String, dynamic> buildFixedAmountPaymentBody({
   };
 }
 
+/// [linePayments]: `lineItemId` + isteğe bağlı `amount` (null = satırın kalanının tamamı).
+Map<String, dynamic> buildProductLinesPaymentBody({
+  required String method,
+  required List<Map<String, dynamic>> linePayments,
+  double tipAmount = 0,
+}) {
+  return {
+    'mode': 'PRODUCT_LINES',
+    'fixedAmount': null,
+    'linePayments': linePayments,
+    'method': method,
+    'tipAmount': tipAmount,
+    'externalReference': null,
+    'printToPrinterId': null,
+  };
+}
+
 Future<CloseTableSessionResultDto> closeTableSession({
   required String edgeBaseUrl,
   required String? accessToken,
@@ -192,6 +249,111 @@ class CloseTableSessionResultDto {
       tableLabel: j['tableLabel'] as String? ?? '',
       closedOrderIds: raw.map((e) => e.toString()).toList(),
       tableReleased: j['tableReleased'] as bool? ?? false,
+    );
+  }
+}
+
+class ClosureBalanceReportDto {
+  ClosureBalanceReportDto({
+    required this.totalDeferredRemaining,
+    required this.deferredOrders,
+    required this.exceptionClosures,
+  });
+
+  final double totalDeferredRemaining;
+  final List<DeferredOrderRowDto> deferredOrders;
+  final List<ClosureAuditRowDto> exceptionClosures;
+
+  factory ClosureBalanceReportDto.fromJson(Map<String, dynamic> j) {
+    final def = j['deferredOrders'] as List<dynamic>? ?? [];
+    final aud = j['exceptionClosures'] as List<dynamic>? ?? [];
+    return ClosureBalanceReportDto(
+      totalDeferredRemaining: _readMoney(j['totalDeferredRemaining']),
+      deferredOrders: def
+          .map((e) => DeferredOrderRowDto.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      exceptionClosures: aud
+          .map((e) => ClosureAuditRowDto.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
+class DeferredOrderRowDto {
+  DeferredOrderRowDto({
+    required this.orderId,
+    required this.orderNumber,
+    required this.status,
+    required this.tableId,
+    required this.tableLabel,
+    required this.remainingPrincipal,
+    required this.orderedAt,
+  });
+
+  final String orderId;
+  final String orderNumber;
+  final String status;
+  final String? tableId;
+  final String tableLabel;
+  final double remainingPrincipal;
+  final String orderedAt;
+
+  factory DeferredOrderRowDto.fromJson(Map<String, dynamic> j) {
+    return DeferredOrderRowDto(
+      orderId: j['orderId'].toString(),
+      orderNumber: j['orderNumber'] as String? ?? '',
+      status: j['status'] as String? ?? '',
+      tableId: j['tableId']?.toString(),
+      tableLabel: j['tableLabel'] as String? ?? '-',
+      remainingPrincipal: _readMoney(j['remainingPrincipal']),
+      orderedAt: j['orderedAt']?.toString() ?? '',
+    );
+  }
+}
+
+class ClosureAuditRowDto {
+  ClosureAuditRowDto({
+    required this.auditId,
+    required this.orderId,
+    required this.orderNumber,
+    required this.tableId,
+    required this.tableLabel,
+    required this.policy,
+    required this.reasonCode,
+    this.balanceDisposition,
+    required this.remainingPrincipal,
+    required this.closedAt,
+    this.note,
+    this.actorRole,
+  });
+
+  final String auditId;
+  final String orderId;
+  final String orderNumber;
+  final String tableId;
+  final String tableLabel;
+  final String policy;
+  final String reasonCode;
+  final String? balanceDisposition;
+  final double remainingPrincipal;
+  final String closedAt;
+  final String? note;
+  final String? actorRole;
+
+  factory ClosureAuditRowDto.fromJson(Map<String, dynamic> j) {
+    return ClosureAuditRowDto(
+      auditId: j['auditId'].toString(),
+      orderId: j['orderId'].toString(),
+      orderNumber: j['orderNumber'] as String? ?? '',
+      tableId: j['tableId']?.toString() ?? '',
+      tableLabel: j['tableLabel'] as String? ?? '-',
+      policy: j['policy'] as String? ?? '',
+      reasonCode: j['reasonCode'] as String? ?? '',
+      balanceDisposition: j['balanceDisposition'] as String?,
+      remainingPrincipal: _readMoney(j['remainingPrincipal']),
+      closedAt: j['closedAt']?.toString() ?? '',
+      note: j['note'] as String?,
+      actorRole: j['actorRole'] as String?,
     );
   }
 }
@@ -250,10 +412,11 @@ class BillingSummaryDto {
   final double principalPaid;
   final double remainingPrincipal;
   final List<BillingLineDto> lines;
-  final List<dynamic> payments;
+  final List<BillingPaymentSummaryDto> payments;
 
   factory BillingSummaryDto.fromJson(Map<String, dynamic> j) {
     final rawLines = j['lines'] as List<dynamic>? ?? [];
+    final rawPayments = j['payments'] as List<dynamic>? ?? [];
     return BillingSummaryDto(
       orderId: j['orderId'].toString(),
       orderNumber: j['orderNumber'] as String? ?? '',
@@ -264,7 +427,58 @@ class BillingSummaryDto {
       lines: rawLines
           .map((e) => BillingLineDto.fromJson(e as Map<String, dynamic>))
           .toList(),
-      payments: j['payments'] as List<dynamic>? ?? const [],
+      payments: rawPayments
+          .map((e) => BillingPaymentSummaryDto.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
+class BillingPaymentSummaryDto {
+  BillingPaymentSummaryDto({
+    required this.paymentId,
+    required this.principalAmount,
+    required this.tipAmount,
+    required this.method,
+    required this.paidAt,
+  });
+
+  final String paymentId;
+  final double principalAmount;
+  final double tipAmount;
+  final String method;
+  final String paidAt;
+
+  factory BillingPaymentSummaryDto.fromJson(Map<String, dynamic> j) {
+    return BillingPaymentSummaryDto(
+      paymentId: j['paymentId'].toString(),
+      principalAmount: _readMoney(j['principalAmount']),
+      tipAmount: _readMoney(j['tipAmount']),
+      method: j['method'] as String? ?? '',
+      paidAt: j['paidAt']?.toString() ?? '',
+    );
+  }
+}
+
+class BillingRefundResultDto {
+  BillingRefundResultDto({
+    required this.paymentId,
+    required this.refundedPrincipal,
+    required this.remainingPrincipalAfter,
+    required this.orderStatus,
+  });
+
+  final String paymentId;
+  final double refundedPrincipal;
+  final double remainingPrincipalAfter;
+  final String orderStatus;
+
+  factory BillingRefundResultDto.fromJson(Map<String, dynamic> j) {
+    return BillingRefundResultDto(
+      paymentId: j['paymentId'].toString(),
+      refundedPrincipal: _readMoney(j['refundedPrincipal']),
+      remainingPrincipalAfter: _readMoney(j['remainingPrincipalAfter']),
+      orderStatus: j['orderStatus'] as String? ?? '',
     );
   }
 }

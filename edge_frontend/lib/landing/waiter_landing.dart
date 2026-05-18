@@ -6,6 +6,7 @@ import '../auth/auth_session.dart';
 import '../widgets/product_option_picker_dialog.dart';
 import '../widgets/staff_profile_banner.dart';
 import '../waiter/edge_waiter_api.dart';
+import '../waiter/waiter_floor_map_screen.dart';
 
 /// Garson: Edge'den masa listesi, menü + sepet, `POST /api/v1/waiter/orders`.
 class WaiterLanding extends StatefulWidget {
@@ -322,7 +323,9 @@ class _WaiterLandingState extends State<WaiterLanding> {
             children: [
               Text('Masalar', style: Theme.of(context).textTheme.titleLarge),
               TextButton.icon(
-                onPressed: () => _toast(context, 'Salon haritası — yakında.'),
+                onPressed: _tables == null || _tables!.isEmpty
+                    ? null
+                    : () => _openFloorMap(context),
                 icon: const Icon(Icons.map_outlined, size: 18),
                 label: const Text('Harita'),
               ),
@@ -373,6 +376,26 @@ class _WaiterLandingState extends State<WaiterLanding> {
 
   static void _toast(BuildContext context, String m) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+  }
+
+  void _openFloorMap(BuildContext context) {
+    final rid = widget.auth.restaurantId;
+    if (rid == null || rid.isEmpty) {
+      _toast(context, 'Restoran bilgisi eksik (JWT).');
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => WaiterFloorMapScreen(
+          edgeBaseUrl: widget.edgeBaseUrl,
+          restaurantId: rid,
+          accessToken: widget.auth.accessToken,
+          tables: _tables ?? const [],
+          zoneFilter: _zone,
+          onTableSelected: (t) => _openOrderFlow(context, t),
+        ),
+      ),
+    );
   }
 
   Future<void> _openOrderFlow(BuildContext context, WaiterTableDto table) async {

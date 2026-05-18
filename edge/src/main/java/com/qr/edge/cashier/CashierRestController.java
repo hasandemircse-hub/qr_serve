@@ -14,9 +14,11 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.qr.common.security.QrUserPrincipal;
+import com.qr.edge.billing.TableClosureReportingService;
 import com.qr.edge.billing.TableClosureService;
 import com.qr.edge.billing.api.CloseTableSessionRequest;
 import com.qr.edge.billing.api.CloseTableSessionResponse;
+import com.qr.edge.billing.api.ClosureBalanceReportResponse;
 import com.qr.edge.cashier.api.CashierOpenOrdersResponse;
 
 
@@ -28,17 +30,27 @@ public class CashierRestController {
 
 	private final TableClosureService tableClosureService;
 
+	private final TableClosureReportingService tableClosureReportingService;
+
 	public CashierRestController(
 			CashierOpenOrdersService cashierOpenOrdersService,
-			TableClosureService tableClosureService) {
+			TableClosureService tableClosureService,
+			TableClosureReportingService tableClosureReportingService) {
 		this.cashierOpenOrdersService = cashierOpenOrdersService;
 		this.tableClosureService = tableClosureService;
+		this.tableClosureReportingService = tableClosureReportingService;
 	}
 
 	@GetMapping("/open-orders")
 	@PreAuthorize("hasAnyRole('CASHIER','RESTAURANT_ADMIN')")
 	public CashierOpenOrdersResponse openOrders(@AuthenticationPrincipal QrUserPrincipal principal) {
 		return cashierOpenOrdersService.listOpenWithBalance(requireRestaurant(principal));
+	}
+
+	@GetMapping("/balance-report")
+	@PreAuthorize("hasAnyRole('CASHIER','RESTAURANT_ADMIN')")
+	public ClosureBalanceReportResponse balanceReport(@AuthenticationPrincipal QrUserPrincipal principal) {
+		return tableClosureReportingService.buildReport(requireRestaurant(principal));
 	}
 
 	@PostMapping("/tables/{tableId}/close-session")

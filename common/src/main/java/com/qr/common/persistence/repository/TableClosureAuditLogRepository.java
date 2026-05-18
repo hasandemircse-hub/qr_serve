@@ -11,4 +11,6 @@ import com.qr.common.persistence.entity.TableClosureAuditLog;
 public interface TableClosureAuditLogRepository extends JpaRepository<TableClosureAuditLog, UUID> {
 
 	List<TableClosureAuditLog> findByUpdatedAtAfter(LocalDateTime watermark);
+
+	List<TableClosureAuditLog> findByRestaurantIdAndIsDeletedFalseOrderByClosedAtDesc(UUID restaurantId);
 }

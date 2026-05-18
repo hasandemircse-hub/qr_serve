@@ -31,6 +31,7 @@ import com.qr.common.persistence.entity.ProductOption;
 import com.qr.common.persistence.entity.ProductOptionGroup;
 import com.qr.common.persistence.entity.OptionSelectionType;
 import com.qr.common.persistence.entity.RestaurantOrder;
+import com.qr.common.persistence.entity.TableAvailabilityStatus;
 import com.qr.common.persistence.repository.DiningTableRepository;
 import com.qr.common.persistence.repository.MenuRepository;
 import com.qr.common.persistence.repository.OrderLineItemRepository;
@@ -40,6 +41,7 @@ import com.qr.common.persistence.repository.ProductRepository;
 import com.qr.common.persistence.repository.RestaurantOrderRepository;
 import com.qr.common.persistence.repository.RestaurantRepository;
 import com.qr.edge.guest.events.GuestOrderPlacedEvent;
+import com.qr.edge.layout.FloorLayoutService;
 import com.qr.edge.qr.api.CreateQrOrderRequest;
 import com.qr.edge.qr.api.CreateQrOrderRequest.QrOrderLineRequest;
 import com.qr.edge.qr.api.CreateQrOrderResponse;
@@ -70,6 +72,8 @@ public class QrOrderService {
 
 	private final ApplicationEventPublisher eventPublisher;
 
+	private final FloorLayoutService floorLayoutService;
+
 	public QrOrderService(
 			Clock clock,
 			ObjectMapper objectMapper,
@@ -81,7 +85,8 @@ public class QrOrderService {
 			ProductOptionRepository productOptionRepository,
 			RestaurantOrderRepository restaurantOrderRepository,
 			OrderLineItemRepository orderLineItemRepository,
-			ApplicationEventPublisher eventPublisher) {
+			ApplicationEventPublisher eventPublisher,
+			FloorLayoutService floorLayoutService) {
 		this.clock = clock;
 		this.objectMapper = objectMapper;
 		this.restaurantRepository = restaurantRepository;
@@ -93,6 +98,7 @@ public class QrOrderService {
 		this.restaurantOrderRepository = restaurantOrderRepository;
 		this.orderLineItemRepository = orderLineItemRepository;
 		this.eventPublisher = eventPublisher;
+		this.floorLayoutService = floorLayoutService;
 	}
 
 	@Transactional
@@ -152,6 +158,8 @@ public class QrOrderService {
 		}
 
 		if (order.getTableId() != null) {
+			floorLayoutService.updateAvailability(
+					request.restaurantId(), order.getTableId(), TableAvailabilityStatus.OCCUPIED);
 			eventPublisher.publishEvent(new GuestOrderPlacedEvent(order.getId()));
 		}
 

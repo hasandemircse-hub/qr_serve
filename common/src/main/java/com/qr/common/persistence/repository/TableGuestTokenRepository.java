@@ -1,6 +1,7 @@
 package com.qr.common.persistence.repository;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -17,6 +18,10 @@ public interface TableGuestTokenRepository extends JpaRepository<TableGuestToken
 			LocalDateTime now);
 
 	Optional<TableGuestToken> findFirstByRestaurantIdAndTableIdAndIsDeletedFalseOrderByExpiresAtDesc(
+			UUID restaurantId,
+			UUID tableId);
+
+	List<TableGuestToken> findByRestaurantIdAndTableIdAndIsDeletedFalseOrderByExpiresAtDesc(
 			UUID restaurantId,
 			UUID tableId);
 }

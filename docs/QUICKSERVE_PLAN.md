@@ -1,6 +1,6 @@
 # QuickServe — Canlı Ürün ve Teknik Plan
 
-**Son güncelleme:** 2026-05-15  
+**Son güncelleme:** 2026-05-18  
 **Amaç:** Ürün vizyonu, mimari hedefler ve *gerçek kod tabanı durumu* tek yerde; her anlamlı iş sonrası güncellenir. Cursor / AI ve ekip bu dosyayı referans alır.
 
 ---
@@ -41,11 +41,11 @@
 
 | Özellik | Durum | Not |
 |---------|--------|-----|
-| Mekan tasarımı (kat, sürükle-bırak, birleştir/böl) | **Kısmen** | `floor_design_editor_screen`, `FloorLayoutRestController`, birleştirme/bölme API’leri. |
-| Gelişmiş menü (ürün/grup, sıra, resim, notlar) | **Kısmen** | Menü/ürün entity + QR ürün sihirbazı; tam CRUD ve resim yükleme **eksik**. |
+| Mekan tasarımı (kat, sürükle-bırak, birleştir/böl) | **Kısmen** | Kat planı editörü + salon WS (`/ws/v1/layout`); siparişte masa **OCCUPIED**. QR **yenile/iptal** (`guest-tokens`). |
+| Gelişmiş menü (ürün/grup, sıra, resim, notlar) | **Kısmen** | `MenuAdminController` menü/ürün CRUD; `menu_admin_screen` Menü sekmesi. Resim yükleme ve sıralama **eksik**. |
 | Seçenekli ürünler | **Kısmen** | Misafir + garson: option-wizard API + paylaşılan seçim diyaloğu. Admin: grup/seçenek CRUD (`ProductOptionsAdminController`, `product_options_admin_screen`). |
 | Personel yönetimi | **Yapıldı** | `StaffAdminController` (CRUD + şifre sıfırlama); `staff_admin_screen` Personel sekmesi; son admin / kendi hesap silme koruması. |
-| QR masa yönetimi | **Kısmen** | PDF/URL üretimi tarafı; tam “geçersiz kıl” yaşam döngüsü UI **kısmen**. |
+| QR masa yönetimi | **Kısmen** | PDF/URL + telefon QR; **rotate** / **revoke-all** token API + Kat planı **QR yenile / QR iptal**. |
 
 **İstemci:** `edge_frontend` — `/admin`, kurulum sihirbazı `/admin/setup` (Edge `setup` API).
 
@@ -53,9 +53,9 @@
 
 | Rol | Durum | Not |
 |-----|--------|-----|
-| Garson | **Kısmen** | Masa→menü→sepet→sipariş; **seçenekli ürün** (option-wizard). Hazır satır: `GET …/waiter/ready-lines` + WS push. |
+| Garson | **Kısmen** | Masa→menü→sepet→sipariş; seçenekli ürün. **Salon haritası** (`WaiterFloorMapScreen`, layout WS). Hazır satır + WS push. |
 | Mutfak | **Kısmen** | Kuyruk + received/ready + mutfak WS; `LINE_KITCHEN_STATUS` garsona da push. |
-| Kasiyer | **Kısmen** | Açık adisyon + ödeme + kasa WS; **Masayı kapat** standartta bakiye sıfırken, admin force-close başlangıcı var. Kısmi tutar ödeme UI tamam; iade UI yok. |
+| Kasiyer | **Kısmen** | Açık adisyon + ödeme + kasa WS; masa kapat (standart / zorla / bakiye bırak). **Tümü / tutar / satır** tahsilat UI; iade Detay’dan. |
 
 ### D. Müşteri (QR)
 
@@ -90,8 +90,8 @@
 | QR → oturum / masa | **Kısmen** | Token + session API; Flutter lab ile toplu masa testi. |
 | Sepet → onay → mutfak | **Kısmen** | Edge’de sipariş + mutfak WS + `kitchen_landing` gerçek kuyruk. Tam otomasyon (sipariş kapanışı, mutfak dışı roller) **kısmen**. |
 | Alındı / hazır bildirimleri | **Kısmen** | Mutfak + misafir WS; garson hazır paneli + push. |
-| Ödeme (ürün/tutar/toplam, bahşiş) | **Kısmen** | `BillingPaymentService` + kasa UI: kalan tahsilat, belirli tutar tahsilatı ve bahşiş. Satır bazlı ödeme UI / fatura entegrasyonu **kısmen**. |
-| Masa kapanışı | **Kısmen** | `POST /api/v1/cashier/tables/{tableId}/close-session`; standart akışta tüm açık siparişlerde `remainingPrincipal <= 0` şartı. v2 başlangıcı: admin için `FORCE_CLOSE_UNPAID` + reason/note + audit log. |
+| Ödeme (ürün/tutar/toplam, bahşiş) | **Kısmen** | Kasa: kalan / sabit tutar / **satır seçimi** (`PRODUCT_LINES`). Bahşiş + iade. Fatura entegrasyonu **eksik**. |
+| Masa kapanışı | **Kısmen** | `close-session`: standart, zorla, bakiye bırak → `DEFERRED`. Edge **`GET /cashier/balance-report`** + kasa/admin UI. Cloud raporlama **eksik**. |
 
 ### 3.1 Masa kapat — mevcut ve gelecek senaryolar
 
@@ -154,7 +154,7 @@
 | `common` | Entity, Flyway `migration` + `migration-local`, `SyncEntityMergeService`, auth ortakları. |
 | `cloud` | Auth, sync, admin restoran paneli, **`PublicGuestRestController`** (misafir BFF → Edge), güvenlik + CORS. |
 | `edge` | Auth (süperadmin yok), guest (REST + `/guest` SPA + `manifest.json` + **misafir lab**), layout, QR, kitchen, billing, print, setup, sync, güvenlik + CORS. |
-| `edge_frontend` | Personel: login, admin (kat/QR/seçenek/personel yönetimi), garson/mutfak/kasa Edge API ile **kısmen** bağlı; setup sihirbazı. **Misafir:** `/guest-lab`, `/guest/qr` (giriş gerektirmez). |
+| `edge_frontend` | Personel: login, admin (kat/QR/**menü**/seçenek/personel), garson/mutfak/kasa Edge API ile **kısmen** bağlı; setup sihirbazı. **Misafir:** `/guest-lab`, `/guest/qr` (giriş gerektirmez). |
 | `cloud_frontend` | Süperadmin: login + restoran listesi/abonelik + Edge çevrimiçi durumu + restoran oluşturma/silme. |
 | `config/` | Örnek `quickserve-config.sample.yaml`. |
 
@@ -167,7 +167,7 @@
 3. ~~Kasa: açık adisyon + `BillingController` ile ödeme.~~ *(Açık liste API + `cashier_landing` kalan tahsilat ve belirli tutar tahsilatı; satır bazlı ödeme/iade sonraki.)*  
 4. Misafir: Cloud BFF + QR PDF Cloud URL + redirect tamam (localhost). Sırada: `guest.web-base-url` prod, Cloud WS proxy, gerçek internet (WiFi IP / tunnel). Statik `/guest` yedek.  
 5. ~~Cloud: Edge listesi / last seen API + `cloud_frontend` ekranı.~~ *(Temel panel tamam; eşik/heartbeat ayarı ve edge-id’siz restoranlar için ayrı liste isteğe bağlı.)*  
-6. **Masa kapat v2:** Force close + audit + `VOID`/`WRITE_OFF` tamam; sırada deferred balance ve Cloud raporlama.  
+6. ~~**Masa kapat v2:** Edge bakiye raporu.~~ *(Tamam; Cloud süperadmin raporu sonraki.)*  
 7. ~~Cloud: restoran **oluşturma/silme** süperadmin için.~~ *(Backend `POST` + soft-delete `DELETE`; `cloud_frontend` form ve onaylı silme tamam.)*
 
 *(Öncelik ürün kararına göre değiştirilir; değişince bu bölümü güncelleyin.)*
@@ -178,6 +178,11 @@
 
 | Tarih | Özet | Modül |
 |-------|------|--------|
+| 2026-05-18 | Garson salon haritası: `WaiterFloorMapScreen` + layout REST/WS; masa dokun → sipariş. | edge_frontend, docs |
+| 2026-05-18 | Bakiye raporu: `GET /cashier/balance-report` (DEFERRED + audit); `ClosureBalanceReportScreen` kasa + admin. | edge, edge_frontend, common, docs |
+| 2026-05-18 | Kasa satır bazlı ödeme: ödeme sheet’inde **Satır** modu, çoklu satır seçimi + `PRODUCT_LINES` API. | edge_frontend, docs |
+| 2026-05-18 | Günlük iş paketi: ödeme iadesi; `DEFER_BALANCE` + `OrderStatus.DEFERRED`; kat planı WS editörde + siparişte OCCUPIED; QR token rotate/revoke. | edge, edge_frontend, common, docs |
+| 2026-05-18 | Menü yönetimi: `MenuAdminController` (`/menus/tree`, menü/ürün CRUD, soft-delete + seçenek cascade); `menu_admin_screen` + Menü sekmesi. | edge, edge_frontend, docs |
 | 2026-05-18 | Misafir Faz 2: QR PDF `public-cloud-url`; lab `cloudGuestUrl`; Cloud redirect HTML yardımı; lab varsayılan Cloud BFF. | edge, cloud, edge_frontend, config, docs |
 | 2026-05-18 | Cloud misafir BFF: `PublicGuestRestController` Edge proxy; `RestaurantEdgeResolver`; `GET /r/...` yönlendirme; Flutter `via=cloud` + misafir lab anahtarı; session’da `edgeRealtimeBaseUrl`. | cloud, edge_frontend, docs |
 | 2026-05-18 | Masa kapat v2: `TableClosureBalanceDisposition` (`VOID`/`WRITE_OFF`), `V17` audit kolonu; zorla kapatmada bakiye sınıflandırması zorunlu; kasa UI seçimi. | common, edge, edge_frontend, docs |

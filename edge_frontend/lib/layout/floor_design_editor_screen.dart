@@ -7,6 +7,7 @@ import 'package:printing/printing.dart';
 
 import '../guest/guest_table_qr_sheet.dart';
 import 'floor_layout_models.dart';
+import 'layout_ws_client.dart';
 
 class _TablePose {
   _TablePose({
@@ -51,6 +52,7 @@ class _FloorDesignEditorScreenState extends State<FloorDesignEditorScreen> {
   bool _loading = true;
   String? _error;
   final TextEditingController _zoneCtl = TextEditingController();
+  LayoutWebSocketClient? _layoutWs;
 
   Uri _api(String path) {
     final base = widget.edgeBaseUrl.replaceAll(RegExp(r'/+$'), '');
@@ -78,8 +80,48 @@ class _FloorDesignEditorScreenState extends State<FloorDesignEditorScreen> {
 
   @override
   void dispose() {
+    _layoutWs?.disconnect();
     _zoneCtl.dispose();
     super.dispose();
+  }
+
+  void _connectLayoutWs() {
+    _layoutWs?.disconnect();
+    final base = Uri.parse(widget.edgeBaseUrl.trim());
+    final wsScheme = base.scheme == 'https' ? 'wss' : 'ws';
+    final port = base.hasPort ? base.port : 8081;
+    final wsUri = Uri.parse(
+      '$wsScheme://${base.host}:$port/ws/v1/layout?restaurantId=${widget.restaurantId}',
+    );
+    _layoutWs = LayoutWebSocketClient(
+      wsUri: wsUri,
+      onSnapshot: (snap) {
+        if (!mounted) return;
+        _applyLiveSnapshot(snap);
+      },
+    )..connect();
+  }
+
+  void _applyLiveSnapshot(FloorLayoutSnapshot snap) {
+    for (final f in snap.floors) {
+      for (final t in f.tables) {
+        _poses.putIfAbsent(
+          t.tableId,
+          () => _TablePose(
+            x: t.x,
+            y: t.y,
+            rotation: t.rotation,
+            zone: t.zone,
+          ),
+        );
+      }
+    }
+    setState(() {
+      _snapshot = snap;
+      if (_floorTab >= snap.floors.length) {
+        _floorTab = 0;
+      }
+    });
   }
 
   Future<void> _load() async {
@@ -118,6 +160,7 @@ class _FloorDesignEditorScreenState extends State<FloorDesignEditorScreen> {
         _loading = false;
         _syncZoneField();
       });
+      _connectLayoutWs();
     } catch (e) {
       setState(() {
         _error = '$e';
@@ -348,6 +391,63 @@ class _FloorDesignEditorScreenState extends State<FloorDesignEditorScreen> {
       }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Birleştirme kaldırıldı (grup tamamı).')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  Future<void> _revokeGuestQr(String tableId) async {
+    try {
+      final uri = _api(
+        '/api/v1/restaurants/${widget.restaurantId}/tables/$tableId/guest-tokens',
+      );
+      final res = await http.delete(uri, headers: _headers);
+      if (!mounted) return;
+      if (res.statusCode != 204) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('QR iptal: ${res.statusCode} ${res.body}')),
+        );
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Masa QR tokenları geçersiz kılındı.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  Future<void> _rotateGuestQr(String tableId) async {
+    try {
+      final uri = _api(
+        '/api/v1/restaurants/${widget.restaurantId}/tables/$tableId/guest-tokens/rotate',
+      );
+      final res = await http.post(uri, headers: _headers);
+      if (!mounted) return;
+      if (res.statusCode != 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('QR yenile: ${res.statusCode} ${res.body}')),
+        );
+        return;
+      }
+      final j = jsonDecode(res.body) as Map<String, dynamic>;
+      final url = j['phoneScanUrl'] as String? ?? '';
+      if (url.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Yeni QR linki boş')),
+        );
+        return;
+      }
+      await showGuestTableQrSheet(
+        context,
+        tableLabel: j['tableLabel'] as String? ?? tableId,
+        phoneScanUrl: url,
+        restaurantId: j['restaurantId']?.toString() ?? widget.restaurantId,
+        qrTableId: j['qrTableId']?.toString() ?? tableId,
+        token: j['token'] as String? ?? '',
       );
     } catch (e) {
       if (!mounted) return;
@@ -593,6 +693,16 @@ class _FloorDesignEditorScreenState extends State<FloorDesignEditorScreen> {
                 onPressed: selected != null ? () => _showPhoneQr(selected) : null,
                 icon: const Icon(Icons.qr_code_scanner),
                 label: const Text('Telefon QR'),
+              ),
+              FilledButton.tonalIcon(
+                onPressed: selected != null ? () => _rotateGuestQr(selected) : null,
+                icon: const Icon(Icons.refresh),
+                label: const Text('QR yenile'),
+              ),
+              FilledButton.tonalIcon(
+                onPressed: selected != null ? () => _revokeGuestQr(selected) : null,
+                icon: const Icon(Icons.block),
+                label: const Text('QR iptal'),
               ),
               FilledButton.tonalIcon(
                 onPressed: selected != null ? () => _downloadQrPdf(selected) : null,

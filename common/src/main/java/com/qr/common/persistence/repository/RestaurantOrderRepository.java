@@ -40,4 +40,14 @@ public interface RestaurantOrderRepository extends JpaRepository<RestaurantOrder
 			UUID restaurantId,
 			UUID tableId,
 			Collection<OrderStatus> statuses);
+
+	List<RestaurantOrder> findByRestaurantIdAndTableIdAndIsDeletedFalseAndStatusInOrderByOrderedAtDesc(
+			UUID restaurantId,
+			UUID tableId,
+			Collection<OrderStatus> statuses);
+
+	boolean existsByRestaurantIdAndTableIdAndIsDeletedFalseAndStatusIn(
+			UUID restaurantId,
+			UUID tableId,
+			Collection<OrderStatus> statuses);
 }

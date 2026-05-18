@@ -7,5 +7,7 @@ public enum OrderStatus {
 	READY,
 	SERVED,
 	CLOSED,
+	/** Masa boşaltıldı; tahsilat sonraya bırakıldı (kurumsal hesap vb.). */
+	DEFERRED,
 	CANCELLED
 }

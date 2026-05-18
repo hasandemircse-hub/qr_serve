@@ -42,10 +42,12 @@ public class TableClosureService {
 
 	private static final BigDecimal ZERO = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
 
-	private static final Set<OrderStatus> TERMINAL_STATUSES = EnumSet.of(
-			OrderStatus.CLOSED,
-			OrderStatus.CANCELLED,
-			OrderStatus.DRAFT);
+	/** Masayı meşgul sayan açık adisyonlar (DEFERRED masayı bloklamaz). */
+	private static final Set<OrderStatus> ACTIVE_ON_TABLE = EnumSet.of(
+			OrderStatus.OPEN,
+			OrderStatus.IN_PROGRESS,
+			OrderStatus.READY,
+			OrderStatus.SERVED);
 
 	private final Clock clock;
 
@@ -83,10 +85,7 @@ public class TableClosureService {
 		if (tableId == null) {
 			return;
 		}
-		if (restaurantOrderRepository.existsByRestaurantIdAndTableIdAndIsDeletedFalseAndStatusNotIn(
-				restaurantId,
-				tableId,
-				TERMINAL_STATUSES)) {
+		if (hasActiveOrdersOnTable(restaurantId, tableId)) {
 			return;
 		}
 		releaseTable(restaurantId, tableId);
@@ -114,10 +113,10 @@ public class TableClosureService {
 		TableClosureBalanceDisposition balanceDisposition = request != null ? request.balanceDisposition() : null;
 		validatePolicy(policy, reasonCode, actor);
 		List<RestaurantOrder> active = restaurantOrderRepository
-				.findByRestaurantIdAndTableIdAndIsDeletedFalseAndStatusNotInOrderByOrderedAtDesc(
+				.findByRestaurantIdAndTableIdAndIsDeletedFalseAndStatusInOrderByOrderedAtDesc(
 						restaurantId,
 						tableId,
-						TERMINAL_STATUSES);
+						ACTIVE_ON_TABLE);
 		LocalDateTime now = LocalDateTime.now(clock);
 		List<UUID> closedOrderIds = new ArrayList<>();
 		List<UUID> auditLogIds = new ArrayList<>();
@@ -138,8 +137,14 @@ public class TableClosureService {
 						HttpStatus.BAD_REQUEST,
 						"balanceDisposition is only allowed for force close with remaining balance");
 			}
-			if (order.getStatus() != OrderStatus.CLOSED) {
-				order.setStatus(OrderStatus.CLOSED);
+			if (policy == TableClosurePolicy.DEFER_BALANCE && remaining.compareTo(ZERO) <= 0) {
+				throw new ResponseStatusException(
+						HttpStatus.BAD_REQUEST,
+						"Defer close requires remaining balance; use standard close when paid");
+			}
+			OrderStatus targetStatus = resolveTargetStatus(policy, remaining);
+			if (order.getStatus() != targetStatus) {
+				order.setStatus(targetStatus);
 				order.setUpdatedAt(now);
 				restaurantOrderRepository.save(order);
 				closedOrderIds.add(order.getId());
@@ -163,10 +168,7 @@ public class TableClosureService {
 			auditLogIds.add(savedAudit.getId());
 		}
 		boolean released = false;
-		if (!restaurantOrderRepository.existsByRestaurantIdAndTableIdAndIsDeletedFalseAndStatusNotIn(
-				restaurantId,
-				tableId,
-				TERMINAL_STATUSES)) {
+		if (!hasActiveOrdersOnTable(restaurantId, tableId)) {
 			releaseTable(restaurantId, tableId);
 			released = true;
 		}
@@ -197,11 +199,36 @@ public class TableClosureService {
 			return;
 		}
 		if (reasonCode == TableClosureReasonCode.PAYMENT_COMPLETE) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Force close requires a non-payment reason");
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Non-standard close requires a specific reason");
 		}
-		if (actor == null || actor.role() != UserRole.RESTAURANT_ADMIN) {
+		if (actor == null) {
+			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Authentication required");
+		}
+		if (policy == TableClosurePolicy.DEFER_BALANCE) {
+			if (actor.role() != UserRole.RESTAURANT_ADMIN && actor.role() != UserRole.CASHIER) {
+				throw new ResponseStatusException(
+						HttpStatus.FORBIDDEN,
+						"Only restaurant admin or cashier can defer balance on close");
+			}
+			return;
+		}
+		if (actor.role() != UserRole.RESTAURANT_ADMIN) {
 			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only restaurant admin can force close unpaid tables");
 		}
+	}
+
+	private static OrderStatus resolveTargetStatus(TableClosurePolicy policy, BigDecimal remaining) {
+		if (policy == TableClosurePolicy.DEFER_BALANCE && remaining.compareTo(ZERO) > 0) {
+			return OrderStatus.DEFERRED;
+		}
+		return OrderStatus.CLOSED;
+	}
+
+	private boolean hasActiveOrdersOnTable(UUID restaurantId, UUID tableId) {
+		return restaurantOrderRepository.existsByRestaurantIdAndTableIdAndIsDeletedFalseAndStatusIn(
+				restaurantId,
+				tableId,
+				ACTIVE_ON_TABLE);
 	}
 
 	private void releaseTable(UUID restaurantId, UUID tableId) {

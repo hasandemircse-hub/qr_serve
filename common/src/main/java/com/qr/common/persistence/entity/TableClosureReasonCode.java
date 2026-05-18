@@ -5,5 +5,6 @@ public enum TableClosureReasonCode {
 	MANAGER_FORCE_CLOSE,
 	GUEST_LEFT,
 	STAFF_ERROR,
+	DEFERRED_BALANCE,
 	OTHER
 }

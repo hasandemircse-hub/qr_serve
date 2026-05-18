@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../auth/app_user_role.dart';
 import '../auth/auth_session.dart';
+import '../billing/closure_balance_report_screen.dart';
 import '../billing/edge_cashier_api.dart';
 import '../widgets/staff_profile_banner.dart';
 
@@ -164,6 +165,120 @@ class _CashierLandingState extends State<CashierLanding> {
         res.tableReleased
             ? 'Masa ${res.tableLabel} boşaltıldı.'
             : 'Adisyonlar kapatıldı; masada başka açık hesap olabilir.',
+      );
+      await _load();
+    } catch (e) {
+      if (mounted) _toast('$e');
+    }
+  }
+
+  Future<void> _deferCloseTable(
+    CashierOpenOrderDto order,
+    BillingSummaryDto summary,
+  ) async {
+    if (order.tableId.isEmpty) {
+      _toast('Bu adisyonda masa bilgisi yok.');
+      return;
+    }
+    final noteCtrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Bakiye bırakarak masa kapat'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Kalan ${summary.remainingPrincipal.toStringAsFixed(2)} ₺ tahsil edilmeden masa boşaltılır. '
+              'Adisyon DEFERRED olarak kasada görünmeye devam eder.',
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: noteCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Not (isteğe bağlı)',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Kapat ve bırak'),
+          ),
+        ],
+      ),
+    );
+    final note = noteCtrl.text.trim();
+    noteCtrl.dispose();
+    if (confirmed != true) return;
+    try {
+      final res = await closeTableSession(
+        edgeBaseUrl: widget.edgeBaseUrl,
+        accessToken: widget.auth.accessToken,
+        tableId: order.tableId,
+        body: {
+          'policy': 'DEFER_BALANCE',
+          'reasonCode': 'DEFERRED_BALANCE',
+          'note': note.isEmpty ? null : note,
+        },
+      );
+      if (!mounted) return;
+      _toast(
+        res.tableReleased
+            ? 'Masa ${res.tableLabel} boşaltıldı; bakiye sonraya bırakıldı.'
+            : 'Adisyon ertelendi.',
+      );
+      await _load();
+    } catch (e) {
+      if (mounted) _toast('$e');
+    }
+  }
+
+  Future<void> _refundPayment(
+    CashierOpenOrderDto order,
+    BillingPaymentSummaryDto payment,
+  ) async {
+    final rid = _restaurantId;
+    if (rid == null || rid.isEmpty) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Ödeme iadesi'),
+        content: Text(
+          '${payment.principalAmount.toStringAsFixed(2)} ₺ (${payment.method}) iade edilsin mi?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('İade et'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final res = await postBillingRefund(
+        edgeBaseUrl: widget.edgeBaseUrl,
+        accessToken: widget.auth.accessToken,
+        restaurantId: rid,
+        orderId: order.orderId,
+        paymentId: payment.paymentId,
+      );
+      if (!mounted) return;
+      _toast(
+        'İade tamam. Kalan: ${res.remainingPrincipalAfter.toStringAsFixed(2)} ₺',
       );
       await _load();
     } catch (e) {
@@ -334,6 +449,30 @@ class _CashierLandingState extends State<CashierLanding> {
                       'Satır ${l.lineTotal.toStringAsFixed(2)} ₺ · Kalan ${l.remainingOnLine.toStringAsFixed(2)} ₺',
                     ),
                   ),
+                if (s.payments.isNotEmpty) ...[
+                  const Divider(),
+                  Text(
+                    'Tahsilatlar',
+                    style: Theme.of(ctx).textTheme.titleSmall,
+                  ),
+                  for (final p in s.payments)
+                    ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        '${p.principalAmount.toStringAsFixed(2)} ₺ · ${p.method}',
+                      ),
+                      subtitle: Text(p.paidAt),
+                      trailing: TextButton(
+                        onPressed: () async {
+                          Navigator.pop(ctx);
+                          await _refundPayment(order, p);
+                          if (mounted) await _openDetail(order);
+                        },
+                        child: const Text('İade'),
+                      ),
+                    ),
+                ],
               ],
             ),
           ),
@@ -345,6 +484,17 @@ class _CashierLandingState extends State<CashierLanding> {
                   _closeTable(order);
                 },
                 child: const Text('Masayı kapat'),
+              ),
+            if (order.tableId.isNotEmpty &&
+                s.remainingPrincipal > 0.001 &&
+                (widget.auth.role == AppUserRole.restaurantAdmin ||
+                    widget.auth.role == AppUserRole.cashier))
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _deferCloseTable(order, s);
+                },
+                child: const Text('Bakiye bırak'),
               ),
             if (order.tableId.isNotEmpty &&
                 s.remainingPrincipal > 0.001 &&
@@ -400,8 +550,17 @@ class _CashierLandingState extends State<CashierLanding> {
                 : const Icon(Icons.refresh),
           ),
           IconButton(
-            tooltip: 'Gün sonu',
-            onPressed: () => _toast('Gün sonu raporu yakında.'),
+            tooltip: 'Bakiye raporu',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => ClosureBalanceReportScreen(
+                    edgeBaseUrl: widget.edgeBaseUrl,
+                    accessToken: widget.auth.accessToken,
+                  ),
+                ),
+              );
+            },
             icon: const Icon(Icons.summarize_outlined),
           ),
           IconButton(
@@ -538,7 +697,9 @@ class _CashierLandingState extends State<CashierLanding> {
             runSpacing: 12,
             children: [
               FilledButton.tonalIcon(
-                onPressed: () => _toast('İade / iptal — ayrı API sonrası.'),
+                onPressed: () => _toast(
+                  'İade: adisyonda Detay → tahsilat satırındaki İade.',
+                ),
                 icon: const Icon(Icons.undo_outlined),
                 label: const Text('İade'),
               ),
@@ -587,6 +748,7 @@ class _CashierPaySheetState extends State<_CashierPaySheet> {
   final _amountCtrl = TextEditingController();
   String _method = 'CASH';
   String _paymentMode = 'REMAINDER';
+  final Set<String> _selectedLineIds = {};
   bool _submitting = false;
 
   @override
@@ -607,10 +769,46 @@ class _CashierPaySheetState extends State<_CashierPaySheet> {
     super.dispose();
   }
 
+  double _selectedLinesTotal(BillingSummaryDto summary) {
+    var total = 0.0;
+    for (final l in summary.lines) {
+      if (_selectedLineIds.contains(l.lineItemId)) {
+        total += l.remainingOnLine;
+      }
+    }
+    return total;
+  }
+
+  List<BillingLineDto> _payableLines(BillingSummaryDto summary) {
+    return summary.lines.where((l) => l.remainingOnLine > 0.001).toList();
+  }
+
+  bool _canPay(BillingSummaryDto summary) {
+    if (summary.remainingPrincipal <= 0.001) return false;
+    if (_paymentMode == 'PRODUCT_LINES') {
+      return _selectedLineIds.any((id) {
+        return summary.lines.any(
+          (l) => l.lineItemId == id && l.remainingOnLine > 0.001,
+        );
+      });
+    }
+    return true;
+  }
+
+  String _payButtonLabel(BillingSummaryDto summary) {
+    return switch (_paymentMode) {
+      'FIXED_AMOUNT' => 'Tutarı tahsil et',
+      'PRODUCT_LINES' =>
+        'Seçilenleri tahsil et (${_selectedLinesTotal(summary).toStringAsFixed(2)} ₺)',
+      _ => 'Kalanı tahsil et (${summary.remainingPrincipal.toStringAsFixed(2)} ₺)',
+    };
+  }
+
   Future<void> _pay(BillingSummaryDto summary) async {
     final tip = double.tryParse(_tipCtrl.text.replaceAll(',', '.')) ?? 0;
     if (tip < 0) return;
     final fixedAmount = double.tryParse(_amountCtrl.text.replaceAll(',', '.'));
+    Map<String, dynamic> body;
     if (_paymentMode == 'FIXED_AMOUNT') {
       if (fixedAmount == null || fixedAmount <= 0) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -624,16 +822,45 @@ class _CashierPaySheetState extends State<_CashierPaySheet> {
         );
         return;
       }
+      body = buildFixedAmountPaymentBody(
+        method: _method,
+        fixedAmount: fixedAmount,
+        tipAmount: tip,
+      );
+    } else if (_paymentMode == 'PRODUCT_LINES') {
+      final selected = summary.lines
+          .where(
+            (l) =>
+                _selectedLineIds.contains(l.lineItemId) &&
+                l.remainingOnLine > 0.001,
+          )
+          .toList();
+      if (selected.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('En az bir satır seçin.')),
+        );
+        return;
+      }
+      final principal = _selectedLinesTotal(summary);
+      if (principal > summary.remainingPrincipal + 0.001) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Seçilen tutar kalan bakiyeyi aşamaz.')),
+        );
+        return;
+      }
+      body = buildProductLinesPaymentBody(
+        method: _method,
+        tipAmount: tip,
+        linePayments: [
+          for (final l in selected)
+            {'lineItemId': l.lineItemId, 'amount': null},
+        ],
+      );
+    } else {
+      body = buildRemainderPaymentBody(method: _method, tipAmount: tip);
     }
     setState(() => _submitting = true);
     try {
-      final body = _paymentMode == 'FIXED_AMOUNT'
-          ? buildFixedAmountPaymentBody(
-              method: _method,
-              fixedAmount: fixedAmount!,
-              tipAmount: tip,
-            )
-          : buildRemainderPaymentBody(method: _method, tipAmount: tip);
       final result = await postBillingPayment(
         edgeBaseUrl: widget.edgeBaseUrl,
         accessToken: widget.accessToken,
@@ -712,7 +939,7 @@ class _CashierPaySheetState extends State<_CashierPaySheet> {
                     segments: const [
                       ButtonSegment(
                         value: 'REMAINDER',
-                        label: Text('Tamamı'),
+                        label: Text('Tümü'),
                         icon: Icon(Icons.done_all_outlined),
                       ),
                       ButtonSegment(
@@ -720,11 +947,21 @@ class _CashierPaySheetState extends State<_CashierPaySheet> {
                         label: Text('Tutar'),
                         icon: Icon(Icons.payments_outlined),
                       ),
+                      ButtonSegment(
+                        value: 'PRODUCT_LINES',
+                        label: Text('Satır'),
+                        icon: Icon(Icons.checklist_outlined),
+                      ),
                     ],
                     selected: {_paymentMode},
                     onSelectionChanged: _submitting
                         ? null
-                        : (v) => setState(() => _paymentMode = v.first),
+                        : (v) => setState(() {
+                            _paymentMode = v.first;
+                            if (_paymentMode != 'PRODUCT_LINES') {
+                              _selectedLineIds.clear();
+                            }
+                          }),
                   ),
                   if (_paymentMode == 'FIXED_AMOUNT') ...[
                     const SizedBox(height: 12),
@@ -739,17 +976,82 @@ class _CashierPaySheetState extends State<_CashierPaySheet> {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 12),
+                  if (_paymentMode == 'PRODUCT_LINES') ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Tahsil edilecek satırlar',
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        TextButton(
+                          onPressed: _submitting
+                              ? null
+                              : () {
+                                  setState(() {
+                                    final payable = _payableLines(s);
+                                    if (_selectedLineIds.length ==
+                                        payable.length) {
+                                      _selectedLineIds.clear();
+                                    } else {
+                                      _selectedLineIds
+                                        ..clear()
+                                        ..addAll(
+                                          payable.map((l) => l.lineItemId),
+                                        );
+                                    }
+                                  });
+                                },
+                          child: Text(
+                            _selectedLineIds.length ==
+                                    _payableLines(s).length
+                                ? 'Seçimi kaldır'
+                                : 'Tümünü seç',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 8),
                   for (final l in s.lines)
                     if (l.remainingOnLine > 0.001)
-                      ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        title: Text('${l.productName} × ${l.quantity}'),
-                        trailing: Text(
-                          '${l.remainingOnLine.toStringAsFixed(2)} ₺',
-                        ),
-                      ),
+                      _paymentMode == 'PRODUCT_LINES'
+                          ? CheckboxListTile(
+                              contentPadding: EdgeInsets.zero,
+                              dense: true,
+                              value: _selectedLineIds.contains(l.lineItemId),
+                              onChanged: _submitting
+                                  ? null
+                                  : (checked) {
+                                      setState(() {
+                                        if (checked == true) {
+                                          _selectedLineIds.add(l.lineItemId);
+                                        } else {
+                                          _selectedLineIds.remove(
+                                            l.lineItemId,
+                                          );
+                                        }
+                                      });
+                                    },
+                              title: Text('${l.productName} × ${l.quantity}'),
+                              subtitle: Text(
+                                'Kalan ${l.remainingOnLine.toStringAsFixed(2)} ₺ · '
+                                'Toplam ${l.lineTotal.toStringAsFixed(2)} ₺',
+                              ),
+                              secondary: Text(
+                                '${l.remainingOnLine.toStringAsFixed(2)} ₺',
+                                style: Theme.of(context).textTheme.titleSmall,
+                              ),
+                            )
+                          : ListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              title: Text('${l.productName} × ${l.quantity}'),
+                              trailing: Text(
+                                '${l.remainingOnLine.toStringAsFixed(2)} ₺',
+                              ),
+                            ),
                   const Divider(),
                   TextField(
                     controller: _tipCtrl,
@@ -781,20 +1083,14 @@ class _CashierPaySheetState extends State<_CashierPaySheet> {
                   ),
                   const SizedBox(height: 16),
                   FilledButton(
-                    onPressed: s.remainingPrincipal <= 0 || _submitting
-                        ? null
-                        : () => _pay(s),
+                    onPressed: !_canPay(s) || _submitting ? null : () => _pay(s),
                     child: _submitting
                         ? const SizedBox(
                             height: 22,
                             width: 22,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Text(
-                            _paymentMode == 'FIXED_AMOUNT'
-                                ? 'Tutarı tahsil et'
-                                : 'Kalanı tahsil et (${s.remainingPrincipal.toStringAsFixed(2)} ₺)',
-                          ),
+                        : Text(_payButtonLabel(s)),
                   ),
                 ],
               ),

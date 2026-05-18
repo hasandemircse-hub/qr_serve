@@ -402,7 +402,7 @@ public class BillingPaymentService {
 
 	private static void assertPayable(OrderStatus status) {
 		switch (status) {
-			case OPEN, IN_PROGRESS, READY, SERVED -> {
+			case OPEN, IN_PROGRESS, READY, SERVED, DEFERRED -> {
 			}
 			default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Order not payable in status " + status);
 		}

@@ -6,8 +6,10 @@ import '../setup/edge_setup_api.dart';
 import '../widgets/staff_profile_banner.dart';
 import '../layout/floor_design_editor_screen.dart';
 import '../layout/floor_layout_terminal_screen.dart';
+import '../admin/menu_admin_screen.dart';
 import '../admin/product_options_admin_screen.dart';
 import '../admin/staff_admin_screen.dart';
+import '../billing/closure_balance_report_screen.dart';
 
 /// Restoran yöneticisi: menü / personel / masa düzeni — LAN Edge + isteğe bağlı Cloud.
 class RestaurantAdminLanding extends StatefulWidget {
@@ -59,12 +61,19 @@ class _RestaurantAdminLandingState extends State<RestaurantAdminLanding> {
     return switch (_tab) {
       0 => 'Salon düzeni',
       1 => 'Kat planı editörü',
-      2 => 'Ürün seçenekleri',
+      2 => 'Menü yönetimi',
+      3 => 'Ürün seçenekleri',
       _ => 'Personel',
     };
   }
 
-  static const _navLabels = ['Salon', 'Kat planı', 'Seçenekler', 'Personel'];
+  static const _navLabels = [
+    'Salon',
+    'Kat planı',
+    'Menü',
+    'Seçenekler',
+    'Personel',
+  ];
 
   static String _wsHostPort(String edgeBaseUrl) {
     final u = Uri.parse(edgeBaseUrl);
@@ -115,15 +124,31 @@ class _RestaurantAdminLandingState extends State<RestaurantAdminLanding> {
                 roleLabel: 'RESTORAN YÖNETİCİSİ',
                 icon: Icons.admin_panel_settings_outlined,
                 subtitle:
-                    'Alt menüden Salon, Kat planı veya Seçenekler sekmesine geçin.',
+                    'Salon, Kat planı, Menü, Seçenekler veya Personel sekmesine geçin.',
               ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.summarize_outlined),
+              title: const Text('Bakiye raporu'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ClosureBalanceReportScreen(
+                      edgeBaseUrl: widget.edgeBaseUrl,
+                      accessToken: widget.auth.accessToken,
+                    ),
+                  ),
+                );
+              },
             ),
             for (var i = 0; i < _navLabels.length; i++)
               ListTile(
                 leading: Icon(switch (i) {
                   0 => Icons.table_restaurant,
                   1 => Icons.design_services_outlined,
-                  2 => Icons.tune_outlined,
+                  2 => Icons.restaurant_menu_outlined,
+                  3 => Icons.tune_outlined,
                   _ => Icons.groups_outlined,
                 }),
                 title: Text(_navLabels[i]),
@@ -151,6 +176,11 @@ class _RestaurantAdminLandingState extends State<RestaurantAdminLanding> {
             label: 'Kat planı',
           ),
           NavigationDestination(
+            icon: Icon(Icons.restaurant_menu_outlined),
+            selectedIcon: Icon(Icons.restaurant_menu),
+            label: 'Menü',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.tune_outlined),
             selectedIcon: Icon(Icons.tune),
             label: 'Seçenekler',
@@ -173,6 +203,11 @@ class _RestaurantAdminLandingState extends State<RestaurantAdminLanding> {
             edgeBaseUrl: widget.edgeBaseUrl,
             restaurantId: _effectiveRestaurantId,
             authToken: widget.auth.accessToken ?? '',
+          ),
+          MenuAdminScreen(
+            edgeBaseUrl: widget.edgeBaseUrl,
+            accessToken: widget.auth.accessToken,
+            restaurantId: _effectiveRestaurantId,
           ),
           ProductOptionsAdminScreen(
             edgeBaseUrl: widget.edgeBaseUrl,
