@@ -13,7 +13,12 @@ import com.qr.edge.guest.api.GuestLabTablesResponse;
 
 @RestController
 @RequestMapping("/api/v1/guest/lab")
-@CrossOrigin(originPatterns = { "http://localhost:*", "http://127.0.0.1:*" })
+@CrossOrigin(originPatterns = {
+		"http://localhost:*",
+		"http://127.0.0.1:*",
+		"http://192.168.*:*",
+		"http://10.*:*"
+})
 @ConditionalOnProperty(prefix = "quickserve", name = "guest-lab-enabled", havingValue = "true")
 public class GuestLabRestController {
 

@@ -4,6 +4,7 @@ import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:go_router/go_router.dart';
 
 import 'auth/auth_session.dart';
+import 'config/resolve_cloud_base_url.dart';
 import 'config/resolve_edge_base_url.dart';
 import 'router/app_router.dart';
 
@@ -32,6 +33,9 @@ class QuickServeEdgeApp extends StatefulWidget {
   /// sayfa host'u (localhost / 127.0.0.1) hizalanır.
   static const edgeBaseUrlConfigured = 'http://127.0.0.1:8081';
 
+  /// Cloud misafir BFF (internet QR REST). WebSocket hâlâ Edge üzerinden.
+  static const cloudBaseUrlConfigured = 'http://127.0.0.1:8080';
+
   @override
   State<QuickServeEdgeApp> createState() => _QuickServeEdgeAppState();
 }
@@ -44,9 +48,12 @@ class _QuickServeEdgeAppState extends State<QuickServeEdgeApp> {
     super.initState();
     final edgeBaseUrl =
         resolveEdgeBaseUrl(QuickServeEdgeApp.edgeBaseUrlConfigured);
+    final cloudBaseUrl =
+        resolveCloudBaseUrl(QuickServeEdgeApp.cloudBaseUrlConfigured);
     _router = createAppRouter(
       auth: widget.auth,
       edgeBaseUrl: edgeBaseUrl,
+      cloudBaseUrl: cloudBaseUrl,
       demoRestaurantId: QuickServeEdgeApp.demoRestaurantId,
       demoProductId: QuickServeEdgeApp.demoProductId,
     );

@@ -181,6 +181,7 @@ class _CashierLandingState extends State<CashierLanding> {
     }
     final noteCtrl = TextEditingController();
     var reasonCode = 'MANAGER_FORCE_CLOSE';
+    var balanceDisposition = 'VOID';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -193,6 +194,27 @@ class _CashierLandingState extends State<CashierLanding> {
               children: [
                 Text(
                   'Kalan bakiye: ${summary.remainingPrincipal.toStringAsFixed(2)} ₺',
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: balanceDisposition,
+                  decoration: const InputDecoration(
+                    labelText: 'Kalan bakiye',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'VOID',
+                      child: Text('İptal (VOID)'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'WRITE_OFF',
+                      child: Text('Zarar yaz (WRITE_OFF)'),
+                    ),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) setDialogState(() => balanceDisposition = v);
+                  },
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
@@ -256,6 +278,7 @@ class _CashierLandingState extends State<CashierLanding> {
         body: {
           'policy': 'FORCE_CLOSE_UNPAID',
           'reasonCode': reasonCode,
+          'balanceDisposition': balanceDisposition,
           'note': note.isEmpty ? null : note,
         },
       );

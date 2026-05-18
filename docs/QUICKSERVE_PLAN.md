@@ -31,7 +31,7 @@
 
 | Özellik | Durum | Not |
 |---------|--------|-----|
-| Restoran CRUD, dondurma, demo | **Kısmen** | Cloud API: liste + `PATCH …/subscription`. **POST yeni restoran / silme** yok. |
+| Restoran CRUD, dondurma, demo | **Kısmen** | Cloud API: liste + `PATCH …/subscription` + `POST` oluşturma + soft-delete `DELETE`. |
 | Canlı izleme (online/offline, last seen) | **Kısmen** | `GET /api/v1/admin/restaurants` → Edge durumu (`ONLINE` / `OFFLINE` / `NEVER_SEEN`, son hello, URL); `cloud_frontend` süperadmin kartları + 30 sn otomatik yenileme. Edge periyodik heartbeat (`EdgeHeartbeatScheduler`, ~60 sn). Eşik: `quickserve.admin.edge-online-threshold-seconds` (varsayılan 180). |
 | Impersonation | **Yapılmadı** | — |
 
@@ -44,7 +44,7 @@
 | Mekan tasarımı (kat, sürükle-bırak, birleştir/böl) | **Kısmen** | `floor_design_editor_screen`, `FloorLayoutRestController`, birleştirme/bölme API’leri. |
 | Gelişmiş menü (ürün/grup, sıra, resim, notlar) | **Kısmen** | Menü/ürün entity + QR ürün sihirbazı; tam CRUD ve resim yükleme **eksik**. |
 | Seçenekli ürünler | **Kısmen** | Misafir + garson: option-wizard API + paylaşılan seçim diyaloğu. Admin: grup/seçenek CRUD (`ProductOptionsAdminController`, `product_options_admin_screen`). |
-| Personel yönetimi | **Yapılmadı** | RBAC seed var; **admin UI yok**. |
+| Personel yönetimi | **Yapıldı** | `StaffAdminController` (CRUD + şifre sıfırlama); `staff_admin_screen` Personel sekmesi; son admin / kendi hesap silme koruması. |
 | QR masa yönetimi | **Kısmen** | PDF/URL üretimi tarafı; tam “geçersiz kıl” yaşam döngüsü UI **kısmen**. |
 
 **İstemci:** `edge_frontend` — `/admin`, kurulum sihirbazı `/admin/setup` (Edge `setup` API).
@@ -65,7 +65,7 @@
 | Sipariş durumu anlık izleme | **Kısmen** | `GET …/orders/open` + `ORDER_CONFIRMED` / `LINE_KITCHEN_STATUS` WS; Flutter `GuestQrMenuScreen` ile Durum sekmesi. |
 | Seçenekli ürün (misafir) | **Kısmen** | `GET …/products/{id}/option-wizard` (token doğrulamalı). |
 | Misafir lab (dev) | **Yapıldı** | `quickserve.guest-lab-enabled=true` iken `GET /api/v1/guest/lab/restaurants/{id}/tables` — masa listesi + geçerli `TableGuestToken`. **Varsayılan kapalı;** `application-local.yml` içinde açık. |
-| Cloud üzerinden misafir (internet QR) | **Yapılmadı** | Hedef mimari: public guest endpoint Cloud’da; restoran/Edge eşlemesi ve güvenli yönlendirme — implementasyon bekleniyor. |
+| Cloud üzerinden misafir (internet QR) | **Kısmen** | Cloud BFF REST proxy + `GET /r/...` redirect (`via=cloud`). QR PDF ve lab’da **Cloud URL** (`public-cloud-url`). `guest.web-base-url` = Flutter Web (redirect). WS: `edgeRealtimeBaseUrl` → Edge. Cloud WS proxy sonraki. |
 
 **Hedef iş akışı (ürün):** Müşteri QR’ı internet üzerinden **Cloud**’a gider; Cloud hangi restoran/Edge olduğunu çözer ve sipariş/durum trafiğini doğru Edge örneğine bağlar (offline dönemlerde Edge LAN davranışı aynı kalır).
 
@@ -79,7 +79,7 @@
 
 | Aşama | Hedef (Cloud-first) | Mevcut kod / test |
 |-------|---------------------|-------------------|
-| QR / link | Cloud public URL; restoran ve masa Cloud’da çözülür | Yerelde: Flutter **Misafir lab** veya doğrudan Edge `/guest` URL’si |
+| QR / link | Cloud public URL; restoran ve masa Cloud’da çözülür | QR PDF → `public-cloud-url` + `/r/...`; redirect → Flutter `/#/guest/qr?via=cloud` |
 | Oturum | Cloud veya Edge BFF; token güvenli dağıtım | Edge `TableGuestToken` + `GET …/guest/.../session` |
 | Menü / sepet | Cloud proxy → Edge veya sync cache (tasarım kararı) | Edge `GET …/menu`, sepet istemci tarafı |
 | Sipariş | Cloud → doğru Edge `POST …/orders` | Edge’e doğrudan `POST …/orders` |
@@ -101,7 +101,7 @@
 
 | Senaryo | Örnek durum | Taslak davranış |
 |---------|-------------|-----------------|
-| **Zorunlu kapat (force)** | Müşteri ayrıldı, hesap ödenmeyecek / şikâyet | **Başladı:** restoran admini açık bakiye ile kapatabilir; kalan tutar audit’e yazılır. `VOID` / `WRITE_OFF` finansal sınıflandırması sonraki adım. |
+| **Zorunlu kapat (force)** | Müşteri ayrıldı, hesap ödenmeyecek / şikâyet | Restoran admini açık bakiye ile kapatabilir; audit’te `remaining_principal` + `balance_disposition` (`VOID` / `WRITE_OFF`). Kasa zorla kapat diyaloğunda seçim. |
 | **Bakiye bırakarak kapat** | Kurumsal hesap, sonradan fatura | Masa serbest; sipariş `OPEN` veya `DEFERRED` kalır; Cloud sync’e işaret. |
 | **Masayı devret** | Yanlış masa, birleştirme | Aktif oturum hedef masaya taşınır; kaynak masa kapanır. |
 | **Kısmi ödeme sonrası kapat** | Nakit yetmedi, kalan silindi | Kalan tutar indirim/iptal kodu; kapatma onayı. |
@@ -152,10 +152,10 @@
 | Parça | İçerik |
 |-------|--------|
 | `common` | Entity, Flyway `migration` + `migration-local`, `SyncEntityMergeService`, auth ortakları. |
-| `cloud` | Auth, sync, `AdminRestaurantController` (+ Edge durumu özeti), `AdminEdgeMonitoringService`, güvenlik + CORS. |
+| `cloud` | Auth, sync, admin restoran paneli, **`PublicGuestRestController`** (misafir BFF → Edge), güvenlik + CORS. |
 | `edge` | Auth (süperadmin yok), guest (REST + `/guest` SPA + `manifest.json` + **misafir lab**), layout, QR, kitchen, billing, print, setup, sync, güvenlik + CORS. |
-| `edge_frontend` | Personel: login, admin (kat/QR), garson/mutfak/kasa Edge API ile **kısmen** bağlı; setup sihirbazı. **Misafir:** `/guest-lab`, `/guest/qr` (giriş gerektirmez). |
-| `cloud_frontend` | Süperadmin: login + restoran listesi/abonelik + Edge çevrimiçi durumu. |
+| `edge_frontend` | Personel: login, admin (kat/QR/seçenek/personel yönetimi), garson/mutfak/kasa Edge API ile **kısmen** bağlı; setup sihirbazı. **Misafir:** `/guest-lab`, `/guest/qr` (giriş gerektirmez). |
+| `cloud_frontend` | Süperadmin: login + restoran listesi/abonelik + Edge çevrimiçi durumu + restoran oluşturma/silme. |
 | `config/` | Örnek `quickserve-config.sample.yaml`. |
 
 ---
@@ -165,10 +165,10 @@
 1. ~~Garson: masa → menü → sepet → Edge sipariş API.~~ *(Edge API + `waiter_landing` temel akış tamam; seçenekli ürün / harita sonraki.)*  
 2. ~~Mutfak: gerçek kuyruk + durum butonları + (isteğe bağlı) WS.~~ *(Temel kuyruk + butonlar + WS yenileme tamam; garson push / servis çıkışı API sonraki.)*  
 3. ~~Kasa: açık adisyon + `BillingController` ile ödeme.~~ *(Açık liste API + `cashier_landing` kalan tahsilat ve belirli tutar tahsilatı; satır bazlı ödeme/iade sonraki.)*  
-4. Misafir: Flutter `edge_frontend` `/guest-lab` + `/guest/qr` + Edge guest option-wizard; **Cloud public misafir BFF** ve internet QR yönlendirmesi sonraki sprint. Statik `/guest` yedek.  
+4. Misafir: Cloud BFF + QR PDF Cloud URL + redirect tamam (localhost). Sırada: `guest.web-base-url` prod, Cloud WS proxy, gerçek internet (WiFi IP / tunnel). Statik `/guest` yedek.  
 5. ~~Cloud: Edge listesi / last seen API + `cloud_frontend` ekranı.~~ *(Temel panel tamam; eşik/heartbeat ayarı ve edge-id’siz restoranlar için ayrı liste isteğe bağlı.)*  
-6. **Masa kapat v2:** Force close + audit başlangıcı tamam; sırada bakiye sınıflandırması (`VOID` / `WRITE_OFF`), deferred balance ve raporlama.  
-7. ~~Cloud: restoran **oluşturma** (POST) süperadmin için.~~ *(Backend `POST /api/v1/admin/restaurants` + `cloud_frontend` form tamam.)*
+6. **Masa kapat v2:** Force close + audit + `VOID`/`WRITE_OFF` tamam; sırada deferred balance ve Cloud raporlama.  
+7. ~~Cloud: restoran **oluşturma/silme** süperadmin için.~~ *(Backend `POST` + soft-delete `DELETE`; `cloud_frontend` form ve onaylı silme tamam.)*
 
 *(Öncelik ürün kararına göre değiştirilir; değişince bu bölümü güncelleyin.)*
 
@@ -178,6 +178,11 @@
 
 | Tarih | Özet | Modül |
 |-------|------|--------|
+| 2026-05-18 | Misafir Faz 2: QR PDF `public-cloud-url`; lab `cloudGuestUrl`; Cloud redirect HTML yardımı; lab varsayılan Cloud BFF. | edge, cloud, edge_frontend, config, docs |
+| 2026-05-18 | Cloud misafir BFF: `PublicGuestRestController` Edge proxy; `RestaurantEdgeResolver`; `GET /r/...` yönlendirme; Flutter `via=cloud` + misafir lab anahtarı; session’da `edgeRealtimeBaseUrl`. | cloud, edge_frontend, docs |
+| 2026-05-18 | Masa kapat v2: `TableClosureBalanceDisposition` (`VOID`/`WRITE_OFF`), `V17` audit kolonu; zorla kapatmada bakiye sınıflandırması zorunlu; kasa UI seçimi. | common, edge, edge_frontend, docs |
+| 2026-05-18 | Restoran admin personel yönetimi: listeleme + personel ekleme/düzenleme/silme + şifre sıfırlama; son admini koruyan backend kontrolleri. | edge, edge_frontend, docs |
+| 2026-05-18 | Cloud süperadmin restoran silme: `DELETE /api/v1/admin/restaurants/{id}` soft-delete; dashboard kartlarında onaylı silme aksiyonu. | cloud, cloud_frontend, docs |
 | 2026-05-18 | Kasa kısmi ödeme UI: ödeme sheet’inde `REMAINDER` / `FIXED_AMOUNT` seçimi, tutar validasyonu ve backend `FIXED_AMOUNT` ödeme gövdesi. | edge_frontend, docs |
 | 2026-05-18 | Cloud süperadmin restoran oluşturma: `POST /api/v1/admin/restaurants`, validasyonlu create request, `cloud_frontend` “Restoran ekle” diyaloğu; yeni restoran `NEVER_SEEN` Edge durumu ile listelenir. | cloud, cloud_frontend, docs |
 | 2026-05-18 | Masa kapat v2 başlangıcı: `TableClosurePolicy`, `TableClosureReasonCode`, `table_closure_audit_logs`; admin için açık bakiyeli `FORCE_CLOSE_UNPAID` akışı ve kasa UI’da reason/note diyaloğu. | common, edge, edge_frontend, docs |

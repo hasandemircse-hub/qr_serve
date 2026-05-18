@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:printing/printing.dart';
 
+import '../guest/guest_table_qr_sheet.dart';
 import 'floor_layout_models.dart';
 
 class _TablePose {
@@ -354,6 +355,44 @@ class _FloorDesignEditorScreenState extends State<FloorDesignEditorScreen> {
     }
   }
 
+  Future<void> _showPhoneQr(String tableId) async {
+    try {
+      final uri = _api(
+        '/api/v1/restaurants/${widget.restaurantId}/tables/$tableId/guest-phone-qr',
+      );
+      final res = await http.get(uri, headers: {
+        'Authorization': 'Bearer ${widget.authToken}',
+        'Accept': 'application/json',
+      });
+      if (!mounted) return;
+      if (res.statusCode != 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('QR link: ${res.statusCode} ${res.body}')),
+        );
+        return;
+      }
+      final j = jsonDecode(res.body) as Map<String, dynamic>;
+      final url = j['phoneScanUrl'] as String? ?? '';
+      if (url.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Telefon QR linki boş')),
+        );
+        return;
+      }
+      await showGuestTableQrSheet(
+        context,
+        tableLabel: j['tableLabel'] as String? ?? tableId,
+        phoneScanUrl: url,
+        restaurantId: j['restaurantId']?.toString() ?? widget.restaurantId,
+        qrTableId: j['qrTableId']?.toString() ?? tableId,
+        token: j['token'] as String? ?? '',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
   Future<void> _downloadQrPdf(String tableId) async {
     try {
       final uri = _api(
@@ -549,6 +588,11 @@ class _FloorDesignEditorScreenState extends State<FloorDesignEditorScreen> {
               FilledButton.tonal(
                 onPressed: _showSplitDialog,
                 child: const Text('Sipariş böl'),
+              ),
+              FilledButton.tonalIcon(
+                onPressed: selected != null ? () => _showPhoneQr(selected) : null,
+                icon: const Icon(Icons.qr_code_scanner),
+                label: const Text('Telefon QR'),
               ),
               FilledButton.tonalIcon(
                 onPressed: selected != null ? () => _downloadQrPdf(selected) : null,

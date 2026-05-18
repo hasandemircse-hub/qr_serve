@@ -86,6 +86,52 @@ class _SuperadminDashboardPageState extends State<SuperadminDashboardPage> {
     }
   }
 
+  Future<void> _deleteRestaurant(RestaurantSummary r) async {
+    final token = widget.auth.accessToken;
+    if (token == null || _busyId != null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Restoranı sil'),
+        content: Text('${r.name} listeden kaldırılacak.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton.tonalIcon(
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.delete_outline),
+            label: const Text('Sil'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() => _busyId = r.id);
+    try {
+      await deleteRestaurant(
+        cloudBaseUrl: AppConfig.cloudBaseUrl,
+        accessToken: token,
+        restaurantId: r.id,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('${r.name} silindi')));
+        await _load();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    } finally {
+      if (mounted) setState(() => _busyId = null);
+    }
+  }
+
   Future<void> _openCreateDialog() async {
     final token = widget.auth.accessToken;
     if (token == null || _creating) return;
@@ -343,6 +389,7 @@ class _SuperadminDashboardPageState extends State<SuperadminDashboardPage> {
                   r: r,
                   busy: _busyId == r.id,
                   onStatus: (s) => _setStatus(r, s),
+                  onDelete: () => _deleteRestaurant(r),
                 ),
               ),
           ],
@@ -376,11 +423,13 @@ class _RestaurantCard extends StatelessWidget {
     required this.r,
     required this.busy,
     required this.onStatus,
+    required this.onDelete,
   });
 
   final RestaurantSummary r;
   final bool busy;
   final void Function(String status) onStatus;
+  final VoidCallback onDelete;
 
   static const _statuses = ['DEMO', 'ACTIVE', 'FROZEN'];
 
@@ -430,6 +479,11 @@ class _RestaurantCard extends StatelessWidget {
                 Chip(
                   label: Text(r.subscriptionStatus),
                   visualDensity: VisualDensity.compact,
+                ),
+                IconButton(
+                  tooltip: 'Sil',
+                  onPressed: busy ? null : onDelete,
+                  icon: const Icon(Icons.delete_outline),
                 ),
               ],
             ),

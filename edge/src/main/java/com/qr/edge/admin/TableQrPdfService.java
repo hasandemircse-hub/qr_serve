@@ -27,6 +27,7 @@ import com.qr.common.persistence.entity.TableGuestToken;
 import com.qr.common.persistence.repository.DiningTableRepository;
 import com.qr.common.persistence.repository.TableGuestTokenRepository;
 import com.qr.edge.config.QuickserveProperties;
+import com.qr.edge.guest.GuestQrLinks;
 
 
 @Service
@@ -61,8 +62,11 @@ public class TableQrPdfService {
 		TableGuestToken tokenRow = tableGuestTokenRepository
 				.findFirstByRestaurantIdAndTableIdAndIsDeletedFalseOrderByExpiresAtDesc(restaurantId, billingTableId)
 				.orElseGet(() -> createToken(restaurantId, billingTableId));
-		String base = properties.getPublicEdgeUrl().replaceAll("/+$", "");
-		String url = base + "/r/" + restaurantId + "/t/" + billingTableId + "/" + tokenRow.getToken();
+		String url = GuestQrLinks.absolute(
+				properties.resolvePublicCloudUrl(),
+				restaurantId,
+				billingTableId,
+				tokenRow.getToken());
 		BufferedImage qr = toImage(url);
 		try (PDDocument doc = new PDDocument(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
 			PDPage page = new PDPage(PDRectangle.A4);

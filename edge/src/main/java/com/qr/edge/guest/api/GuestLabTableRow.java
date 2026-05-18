@@ -10,5 +10,8 @@ public record GuestLabTableRow(
 		UUID qrTableId,
 		String token,
 		String edgeGuestPath,
-		String edgeGuestUrl) {
+		String edgeGuestUrl,
+		String cloudGuestUrl,
+		/** Telefon kamerası ile okutulacak kısa Cloud QR linki (LAN IP). */
+		String phoneScanUrl) {
 }

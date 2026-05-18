@@ -7,6 +7,7 @@ import '../widgets/staff_profile_banner.dart';
 import '../layout/floor_design_editor_screen.dart';
 import '../layout/floor_layout_terminal_screen.dart';
 import '../admin/product_options_admin_screen.dart';
+import '../admin/staff_admin_screen.dart';
 
 /// Restoran yöneticisi: menü / personel / masa düzeni — LAN Edge + isteğe bağlı Cloud.
 class RestaurantAdminLanding extends StatefulWidget {
@@ -34,7 +35,9 @@ class _RestaurantAdminLandingState extends State<RestaurantAdminLanding> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeOpenSetupWizard());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _maybeOpenSetupWizard(),
+    );
   }
 
   Future<void> _maybeOpenSetupWizard() async {
@@ -56,11 +59,12 @@ class _RestaurantAdminLandingState extends State<RestaurantAdminLanding> {
     return switch (_tab) {
       0 => 'Salon düzeni',
       1 => 'Kat planı editörü',
-      _ => 'Ürün seçenekleri',
+      2 => 'Ürün seçenekleri',
+      _ => 'Personel',
     };
   }
 
-  static const _navLabels = ['Salon', 'Kat planı', 'Seçenekler'];
+  static const _navLabels = ['Salon', 'Kat planı', 'Seçenekler', 'Personel'];
 
   static String _wsHostPort(String edgeBaseUrl) {
     final u = Uri.parse(edgeBaseUrl);
@@ -80,7 +84,10 @@ class _RestaurantAdminLandingState extends State<RestaurantAdminLanding> {
         ),
         title: Text(_appBarTitle()),
         actions: [
-          IconButton(icon: const Icon(Icons.logout), onPressed: widget.auth.signOut),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: widget.auth.signOut,
+          ),
         ],
       ),
       drawer: Drawer(
@@ -88,14 +95,16 @@ class _RestaurantAdminLandingState extends State<RestaurantAdminLanding> {
           padding: EdgeInsets.zero,
           children: [
             DrawerHeader(
-              decoration: BoxDecoration(color: Theme.of(context).colorScheme.primaryContainer),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primaryContainer,
+              ),
               child: Align(
                 alignment: Alignment.bottomLeft,
                 child: Text(
                   widget.auth.displayName ?? 'Yönetici',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
                 ),
               ),
             ),
@@ -105,15 +114,17 @@ class _RestaurantAdminLandingState extends State<RestaurantAdminLanding> {
                 auth: widget.auth,
                 roleLabel: 'RESTORAN YÖNETİCİSİ',
                 icon: Icons.admin_panel_settings_outlined,
-                subtitle: 'Alt menüden Salon, Kat planı veya Seçenekler sekmesine geçin.',
+                subtitle:
+                    'Alt menüden Salon, Kat planı veya Seçenekler sekmesine geçin.',
               ),
             ),
-            for (var i = 0; i < 3; i++)
+            for (var i = 0; i < _navLabels.length; i++)
               ListTile(
                 leading: Icon(switch (i) {
                   0 => Icons.table_restaurant,
                   1 => Icons.design_services_outlined,
-                  _ => Icons.tune_outlined,
+                  2 => Icons.tune_outlined,
+                  _ => Icons.groups_outlined,
                 }),
                 title: Text(_navLabels[i]),
                 selected: _tab == i,
@@ -144,6 +155,11 @@ class _RestaurantAdminLandingState extends State<RestaurantAdminLanding> {
             selectedIcon: Icon(Icons.tune),
             label: 'Seçenekler',
           ),
+          NavigationDestination(
+            icon: Icon(Icons.groups_outlined),
+            selectedIcon: Icon(Icons.groups),
+            label: 'Personel',
+          ),
         ],
       ),
       body: IndexedStack(
@@ -163,6 +179,11 @@ class _RestaurantAdminLandingState extends State<RestaurantAdminLanding> {
             authToken: widget.auth.accessToken ?? '',
             restaurantId: _effectiveRestaurantId,
             initialProductId: widget.demoProductId,
+          ),
+          StaffAdminScreen(
+            edgeBaseUrl: widget.edgeBaseUrl,
+            accessToken: widget.auth.accessToken,
+            restaurantId: _effectiveRestaurantId,
           ),
         ],
       ),

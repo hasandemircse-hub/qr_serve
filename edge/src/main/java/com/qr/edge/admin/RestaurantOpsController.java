@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.RestController;
 import com.qr.edge.admin.api.MergeTablesRequest;
 import com.qr.edge.admin.api.SplitOrderRequest;
 import com.qr.edge.admin.api.UnmergeTableRequest;
+import com.qr.edge.guest.GuestTablePhoneQrService;
+import com.qr.edge.guest.api.GuestPhoneQrLink;
 import com.qr.edge.layout.FloorLayoutService;
 import com.qr.edge.layout.api.CreateDiningTableRequest;
 import com.qr.edge.layout.api.FloorLayoutBroadcast;
@@ -37,15 +39,19 @@ public class RestaurantOpsController {
 
 	private final FloorLayoutService floorLayoutService;
 
+	private final GuestTablePhoneQrService guestTablePhoneQrService;
+
 	public RestaurantOpsController(
 			TableMergeService tableMergeService,
 			OrderSplitService orderSplitService,
 			TableQrPdfService tableQrPdfService,
-			FloorLayoutService floorLayoutService) {
+			FloorLayoutService floorLayoutService,
+			GuestTablePhoneQrService guestTablePhoneQrService) {
 		this.tableMergeService = tableMergeService;
 		this.orderSplitService = orderSplitService;
 		this.tableQrPdfService = tableQrPdfService;
 		this.floorLayoutService = floorLayoutService;
+		this.guestTablePhoneQrService = guestTablePhoneQrService;
 	}
 
 	@PostMapping("/tables")
@@ -76,6 +82,12 @@ public class RestaurantOpsController {
 			@Valid @RequestBody SplitOrderRequest body) {
 		List<UUID> ids = orderSplitService.splitOrder(restaurantId, orderId, body.parts());
 		return new SplitOrderResponse(ids);
+	}
+
+	@GetMapping("/tables/{tableId}/guest-phone-qr")
+	@PreAuthorize("@edgeAuth.isRestaurantAdmin(authentication, #restaurantId)")
+	public GuestPhoneQrLink guestPhoneQr(@PathVariable UUID restaurantId, @PathVariable UUID tableId) {
+		return guestTablePhoneQrService.buildPhoneQrLink(restaurantId, tableId);
 	}
 
 	@GetMapping(value = "/tables/{tableId}/qr-menu.pdf", produces = MediaType.APPLICATION_PDF_VALUE)

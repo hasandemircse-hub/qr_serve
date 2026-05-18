@@ -20,8 +20,16 @@ public class QuickserveProperties {
 
 	private final Setup setup = new Setup();
 
+	private final Demo demo = new Demo();
+
 	/** QR PDF ve misafir linklerinde kullanılacak Edge'in dışarıdan erişilen taban URL'i. */
 	private String publicEdgeUrl = "http://127.0.0.1:8081";
+
+	/**
+	 * Misafir QR ve PDF'lerde kullanılacak Cloud taban URL (internet QR).
+	 * Boşsa {@link Cloud#getBaseUrl()} kullanılır.
+	 */
+	private String publicCloudUrl = "";
 
 	/**
 	 * true iken {@code GET /api/v1/guest/lab/...} ile tüm masalar + test token URL üretilir (yalnızca dev).
@@ -42,6 +50,22 @@ public class QuickserveProperties {
 
 	public void setPublicEdgeUrl(String publicEdgeUrl) {
 		this.publicEdgeUrl = publicEdgeUrl;
+	}
+
+	public String getPublicCloudUrl() {
+		return publicCloudUrl;
+	}
+
+	public void setPublicCloudUrl(String publicCloudUrl) {
+		this.publicCloudUrl = publicCloudUrl;
+	}
+
+	/** Misafir QR / PDF için Cloud kök URL (public-cloud-url veya cloud.base-url). */
+	public String resolvePublicCloudUrl() {
+		if (publicCloudUrl != null && !publicCloudUrl.isBlank()) {
+			return publicCloudUrl.trim().replaceAll("/+$", "");
+		}
+		return cloud.getBaseUrl().trim().replaceAll("/+$", "");
 	}
 
 	public QuickserveMode getMode() {
@@ -78,6 +102,35 @@ public class QuickserveProperties {
 
 	public Setup getSetup() {
 		return setup;
+	}
+
+	public Demo getDemo() {
+		return demo;
+	}
+
+	public static class Demo {
+
+		/** Boşsa yerel ağ IPv4 otomatik seçilir (telefon QR testi). */
+		private String lanHost = "";
+
+		/** Doluysa misafir lab doğrudan Flutter Web QR önerir (Cloud redirect atlanabilir). */
+		private int guestWebPort = 0;
+
+		public String getLanHost() {
+			return lanHost;
+		}
+
+		public void setLanHost(String lanHost) {
+			this.lanHost = lanHost;
+		}
+
+		public int getGuestWebPort() {
+			return guestWebPort;
+		}
+
+		public void setGuestWebPort(int guestWebPort) {
+			this.guestWebPort = guestWebPort;
+		}
 	}
 
 	public static class Setup {

@@ -8,17 +8,21 @@ import '../waiter/edge_waiter_api.dart';
 import '../widgets/product_option_picker_dialog.dart';
 import 'guest_menu_ws_client.dart';
 
-/// Misafir QR: Edge guest API + WebSocket (HTML /guest yerine Flutter).
+/// Misafir QR: Edge veya Cloud BFF guest API + Edge WebSocket.
 class GuestQrMenuScreen extends StatefulWidget {
   const GuestQrMenuScreen({
     super.key,
-    required this.edgeBaseUrl,
+    required this.guestApiBaseUrl,
+    required this.realtimeBaseUrl,
+    this.useCloudGuestApi = false,
     required this.restaurantId,
     required this.tableId,
     required this.token,
   });
 
-  final String edgeBaseUrl;
+  final String guestApiBaseUrl;
+  final String realtimeBaseUrl;
+  final bool useCloudGuestApi;
   final String restaurantId;
   final String tableId;
   final String token;
@@ -36,19 +40,24 @@ class _GuestQrMenuScreenState extends State<GuestQrMenuScreen>
   List<_GuestMenu> _menus = const [];
   final Map<String, Map<String, dynamic>> _orders = {};
   String _wsStatus = 'Bağlanıyor…';
+  String _wsBaseUrl = '';
 
   bool get _paramsOk =>
       widget.restaurantId.isNotEmpty && widget.tableId.isNotEmpty && widget.token.isNotEmpty;
 
-  String get _base => widget.edgeBaseUrl.replaceAll(RegExp(r'/+$'), '');
+  String get _apiBase => widget.guestApiBaseUrl.replaceAll(RegExp(r'/+$'), '');
 
   String _guest(String suffix) {
     final tok = Uri.encodeComponent(widget.token);
-    return '$_base/api/v1/guest/r/${widget.restaurantId}/t/${widget.tableId}/$tok$suffix';
+    final prefix = widget.useCloudGuestApi
+        ? '/api/v1/public/guest/r'
+        : '/api/v1/guest/r';
+    return '$_apiBase$prefix/${widget.restaurantId}/t/${widget.tableId}/$tok$suffix';
   }
 
   Uri _wsUri() {
-    final u = Uri.parse(widget.edgeBaseUrl.trim());
+    final wsBase = _wsBaseUrl.isNotEmpty ? _wsBaseUrl : widget.realtimeBaseUrl;
+    final u = Uri.parse(wsBase.trim());
     final port = u.hasPort ? u.port : 8081;
     final scheme = u.scheme == 'https' ? 'wss' : 'ws';
     return Uri.parse(
@@ -78,6 +87,8 @@ class _GuestQrMenuScreenState extends State<GuestQrMenuScreen>
       final sj = jsonDecode(s.body) as Map<String, dynamic>;
       final rn = sj['restaurantName'] as String? ?? '';
       final tl = sj['tableLabel'] as String? ?? '';
+      final edgeWs = sj['edgeRealtimeBaseUrl'] as String? ?? '';
+      _wsBaseUrl = edgeWs.isNotEmpty ? edgeWs : widget.realtimeBaseUrl;
       setState(() => _subtitle = '$rn · Masa $tl');
       await _loadMenu();
       await _loadOrders();

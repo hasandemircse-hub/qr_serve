@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import 'guest_lab_api.dart';
+import 'guest_table_qr_sheet.dart';
 
-/// Yerel test: restorandaki tüm masaları listeler; tıklanınca Flutter misafir QR akışına gider.
+/// Yerel test: masalar + telefon için QR (aynı WiFi).
 class GuestLabScreen extends StatefulWidget {
   const GuestLabScreen({
     super.key,
@@ -21,7 +21,7 @@ class GuestLabScreen extends StatefulWidget {
 class _GuestLabScreenState extends State<GuestLabScreen> {
   bool _loading = true;
   String? _error;
-  List<GuestLabTableRow> _tables = const [];
+  GuestLabPayload? _payload;
 
   @override
   void initState() {
@@ -35,13 +35,13 @@ class _GuestLabScreenState extends State<GuestLabScreen> {
       _error = null;
     });
     try {
-      final rows = await fetchGuestLabTables(
+      final payload = await fetchGuestLabTables(
         edgeBaseUrl: widget.edgeBaseUrl,
         restaurantId: widget.restaurantId,
       );
       if (!mounted) return;
       setState(() {
-        _tables = rows;
+        _payload = payload;
         _loading = false;
       });
     } catch (e) {
@@ -53,18 +53,30 @@ class _GuestLabScreenState extends State<GuestLabScreen> {
     }
   }
 
-  void _openTable(GuestLabTableRow row) {
-    final r = Uri.encodeQueryComponent(widget.restaurantId);
-    final t = Uri.encodeQueryComponent(row.qrTableId);
-    final k = Uri.encodeQueryComponent(row.token);
-    context.push('/guest/qr?r=$r&t=$t&k=$k');
+  void _showQr(GuestLabTableRow row) {
+    final url = row.phoneScanUrl.isNotEmpty ? row.phoneScanUrl : row.cloudGuestUrl;
+    if (url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('QR linki yok — Edge yeniden başlatıldı mı?')),
+      );
+      return;
+    }
+    showGuestTableQrSheet(
+      context,
+      tableLabel: row.label,
+      phoneScanUrl: url,
+      restaurantId: widget.restaurantId,
+      qrTableId: row.qrTableId,
+      token: row.token,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final payload = _payload;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Misafir lab (test)'),
+        title: const Text('Misafir lab (telefon QR)'),
         actions: [
           IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
         ],
@@ -79,45 +91,80 @@ class _GuestLabScreenState extends State<GuestLabScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(_error!, textAlign: TextAlign.center),
-                        const SizedBox(height: 12),
-                        FilledButton(onPressed: _load, child: const Text('Yeniden dene')),
+                        const SizedBox(height: 16),
+                        FilledButton(onPressed: _load, child: const Text('Tekrar dene')),
                       ],
                     ),
                   ),
                 )
-              : _tables.isEmpty
-                  ? const Center(child: Text('Masa bulunamadı.'))
-                  : ListView.separated(
-                      padding: const EdgeInsets.all(12),
-                      itemCount: _tables.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 8),
-                      itemBuilder: (context, i) {
-                        final row = _tables[i];
-                        return Card(
-                          elevation: 0,
-                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              child: Text(
-                                row.label.isNotEmpty ? row.label.substring(0, 1) : '?',
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (payload != null && payload.lanHost.isNotEmpty)
+                      Material(
+                        color: Theme.of(context).colorScheme.primaryContainer,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Telefon WiFi: ${payload.lanHost}',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                ),
                               ),
-                            ),
-                            title: Text(row.label, style: const TextStyle(fontWeight: FontWeight.w600)),
-                            subtitle: Text(
-                              [
-                                if (row.zone != null && row.zone!.isNotEmpty) 'Bölge: ${row.zone}',
-                                if (row.seatCount != null) 'Koltuk: ${row.seatCount}',
-                                'QR masa id: ${row.qrTableId}',
-                              ].join(' · '),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            trailing: const Icon(Icons.qr_code_2),
-                            onTap: () => _openTable(row),
+                              if (payload.setupHint.isNotEmpty) ...[
+                                const SizedBox(height: 6),
+                                Text(
+                                  payload.setupHint,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
-                        );
-                      },
-                    ),
+                        ),
+                      ),
+                    Expanded(child: _tableList(payload?.tables ?? [])),
+                  ],
+                ),
+    );
+  }
+
+  Widget _tableList(List<GuestLabTableRow> tables) {
+    if (tables.isEmpty) {
+      return const Center(child: Text('Masa bulunamadı.'));
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.all(12),
+      itemCount: tables.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
+      itemBuilder: (context, i) {
+        final row = tables[i];
+        return Card(
+          elevation: 0,
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          child: ListTile(
+            leading: CircleAvatar(
+              child: Text(row.label.isNotEmpty ? row.label.substring(0, 1) : '?'),
+            ),
+            title: Text(row.label, style: const TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Text(
+              [
+                if (row.zone != null && row.zone!.isNotEmpty) 'Bölge: ${row.zone}',
+                if (row.seatCount != null) 'Koltuk: ${row.seatCount}',
+                'Telefon QR için dokun',
+              ].join(' · '),
+            ),
+            trailing: const Icon(Icons.qr_code_scanner),
+            onTap: () => _showQr(row),
+          ),
+        );
+      },
     );
   }
 }

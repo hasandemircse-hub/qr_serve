@@ -1,5 +1,10 @@
 # Yerel geliştirme: PostgreSQL gerekmez. Çalıştırma: --spring.profiles.active=local
 quickserve:
+  public-cloud-url: "http://192.168.1.14:8080"
+  guest:
+    # Sabit Flutter Web portu (.vscode launch: edge_frontend :57632)
+    web-base-url: "http://192.168.1.14:57632"
+    edge-proxy-timeout-seconds: 15
   admin:
     edge-online-threshold-seconds: 180
 

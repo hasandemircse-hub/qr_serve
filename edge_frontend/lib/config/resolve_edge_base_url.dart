@@ -21,6 +21,15 @@ String resolveEdgeBaseUrl(String configured) {
   if (pageHost.isEmpty) return configured;
   if (configuredUri.host == pageHost) return configured;
   const loopback = {'localhost', '127.0.0.1'};
+  // Telefon QR: sayfa 192.168.x.x iken API hâlâ 127.0.0.1 olursa istekler telefona gider.
+  if (loopback.contains(configuredUri.host) && !loopback.contains(pageHost)) {
+    return configuredUri
+        .replace(
+          host: pageHost,
+          port: configuredUri.hasPort ? configuredUri.port : null,
+        )
+        .toString();
+  }
   if (loopback.contains(configuredUri.host) && loopback.contains(pageHost)) {
     return configuredUri
         .replace(

@@ -144,3 +144,24 @@ Future<void> patchRestaurantSubscription({
     throw Exception('Güncelleme (${res.statusCode}): ${res.body}');
   }
 }
+
+Future<void> deleteRestaurant({
+  required String cloudBaseUrl,
+  required String accessToken,
+  required String restaurantId,
+}) async {
+  final root = cloudBaseUrl.endsWith('/')
+      ? cloudBaseUrl.substring(0, cloudBaseUrl.length - 1)
+      : cloudBaseUrl;
+  final uri = Uri.parse('$root/api/v1/admin/restaurants/$restaurantId');
+  final res = await http.delete(
+    uri,
+    headers: {
+      'Authorization': 'Bearer $accessToken',
+      'Accept': 'application/json',
+    },
+  );
+  if (res.statusCode < 200 || res.statusCode >= 300) {
+    throw Exception('Silme (${res.statusCode}): ${res.body}');
+  }
+}

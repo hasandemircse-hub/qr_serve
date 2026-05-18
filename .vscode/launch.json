@@ -20,17 +20,30 @@
 		},
 		{
 			"type": "dart",
-			"name": "Flutter: edge_frontend",
+			"name": "Flutter: edge_frontend (LAN telefon :57632)",
 			"request": "launch",
 			"cwd": "${workspaceFolder}/edge_frontend",
-			"program": "lib/main.dart"
+			"program": "lib/main.dart",
+			"deviceId": "web-server",
+			"toolArgs": ["--web-port=57632", "--web-hostname=0.0.0.0"]
 		},
 		{
 			"type": "dart",
-			"name": "Flutter: cloud_frontend",
+			"name": "Flutter: edge_frontend (Chrome yerel)",
+			"request": "launch",
+			"cwd": "${workspaceFolder}/edge_frontend",
+			"program": "lib/main.dart",
+			"deviceId": "chrome",
+			"toolArgs": ["--web-port=57632"]
+		},
+		{
+			"type": "dart",
+			"name": "Flutter: cloud_frontend (web :57633)",
 			"request": "launch",
 			"cwd": "${workspaceFolder}/cloud_frontend",
-			"program": "lib/main.dart"
+			"program": "lib/main.dart",
+			"deviceId": "chrome",
+			"toolArgs": ["--web-port=57633"]
 		}
 	]
 }

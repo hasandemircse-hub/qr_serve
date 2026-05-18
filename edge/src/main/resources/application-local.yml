@@ -1,12 +1,17 @@
 # Yerel geliştirme: H2 bellek içi DB + demo seed (migration-local).
 # Edge kimliği ve hangi restoran için çalıştığı bu dosyada sabitlenir.
 quickserve:
-  public-edge-url: "http://127.0.0.1:8081"
+  public-edge-url: "http://192.168.1.14:8081"
+  public-cloud-url: "http://192.168.1.14:8080"
   edge-id: "550e8400-e29b-41d4-a716-446655440000"
   restaurant-id: "11111111-1111-1111-1111-111111111111"
   guest-lab-enabled: true
+  demo:
+    lan-host: "192.168.1.14"
+    # Cloud redirect + lab ipucu; launch.json ile aynı port
+    guest-web-port: 57632
   cloud:
-    base-url: http://localhost:8080
+    base-url: http://192.168.1.14:8080
 
 spring:
   datasource:

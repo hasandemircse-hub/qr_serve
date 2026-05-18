@@ -10,6 +10,8 @@ quickserve:
   cloud:
     base-url: http://localhost:8080
     mock: false
+  # Misafir QR (PDF / baskı) — Cloud üzerinden internet siparişi
+  public-cloud-url: "https://cloud.example.com"
   jwt:
     secret: "CHANGE_ME_MIN_32_BYTES_FOR_PRODUCTION_USE"
     expiration-hours: 24

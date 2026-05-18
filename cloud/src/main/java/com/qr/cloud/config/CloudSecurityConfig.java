@@ -28,7 +28,11 @@ public class CloudSecurityConfig {
 				"http://localhost:*",
 				"http://127.0.0.1:*",
 				"https://localhost:*",
-				"https://127.0.0.1:*"));
+				"https://127.0.0.1:*",
+				"http://192.168.*:*",
+				"http://10.*:*",
+				"https://192.168.*:*",
+				"https://10.*:*"));
 		c.setAllowedMethods(List.of("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 		c.setAllowedHeaders(List.of("*"));
 		c.setExposedHeaders(List.of("Authorization"));
@@ -52,6 +56,8 @@ public class CloudSecurityConfig {
 						.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 						.requestMatchers("/api/v1/auth/**").permitAll()
 						.requestMatchers("/api/v1/sync/**").permitAll()
+						.requestMatchers("/api/v1/public/guest/**").permitAll()
+						.requestMatchers(HttpMethod.GET, "/r/**").permitAll()
 						.requestMatchers("/h2-console/**").permitAll()
 						.requestMatchers("/error").permitAll()
 						.requestMatchers("/api/v1/admin/**").hasRole("SUPERADMIN")

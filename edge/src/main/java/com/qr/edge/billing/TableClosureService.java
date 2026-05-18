@@ -21,6 +21,7 @@ import com.qr.common.persistence.entity.OrderLineItem;
 import com.qr.common.persistence.entity.OrderStatus;
 import com.qr.common.persistence.entity.RestaurantOrder;
 import com.qr.common.persistence.entity.TableClosureAuditLog;
+import com.qr.common.persistence.entity.TableClosureBalanceDisposition;
 import com.qr.common.persistence.entity.TableClosurePolicy;
 import com.qr.common.persistence.entity.TableClosureReasonCode;
 import com.qr.common.persistence.entity.TableAvailabilityStatus;
@@ -110,6 +111,7 @@ public class TableClosureService {
 				? request.reasonCode()
 				: TableClosureReasonCode.PAYMENT_COMPLETE;
 		String note = request != null ? trimToNull(request.note()) : null;
+		TableClosureBalanceDisposition balanceDisposition = request != null ? request.balanceDisposition() : null;
 		validatePolicy(policy, reasonCode, actor);
 		List<RestaurantOrder> active = restaurantOrderRepository
 				.findByRestaurantIdAndTableIdAndIsDeletedFalseAndStatusNotInOrderByOrderedAtDesc(
@@ -129,6 +131,13 @@ public class TableClosureService {
 						HttpStatus.BAD_REQUEST,
 						"Adisyon " + label + " için kalan bakiye: " + remaining);
 			}
+			if (policy == TableClosurePolicy.FORCE_CLOSE_UNPAID && remaining.compareTo(ZERO) > 0) {
+				validateBalanceDisposition(balanceDisposition);
+			} else if (balanceDisposition != null) {
+				throw new ResponseStatusException(
+						HttpStatus.BAD_REQUEST,
+						"balanceDisposition is only allowed for force close with remaining balance");
+			}
 			if (order.getStatus() != OrderStatus.CLOSED) {
 				order.setStatus(OrderStatus.CLOSED);
 				order.setUpdatedAt(now);
@@ -144,6 +153,10 @@ public class TableClosureService {
 			audit.setActorUserId(actor != null ? actor.userId() : null);
 			audit.setActorRole(actor != null && actor.role() != null ? actor.role().name() : null);
 			audit.setRemainingPrincipal(remaining);
+			audit.setBalanceDisposition(
+					remaining.compareTo(ZERO) > 0 && policy == TableClosurePolicy.FORCE_CLOSE_UNPAID
+							? balanceDisposition
+							: null);
 			audit.setClosedAt(now);
 			audit.setNote(note);
 			TableClosureAuditLog savedAudit = tableClosureAuditLogRepository.save(audit);
@@ -166,6 +179,14 @@ public class TableClosureService {
 				policy,
 				totalRemaining,
 				auditLogIds);
+	}
+
+	private static void validateBalanceDisposition(TableClosureBalanceDisposition balanceDisposition) {
+		if (balanceDisposition == null) {
+			throw new ResponseStatusException(
+					HttpStatus.BAD_REQUEST,
+					"balanceDisposition (VOID or WRITE_OFF) required when force closing with remaining balance");
+		}
 	}
 
 	private void validatePolicy(

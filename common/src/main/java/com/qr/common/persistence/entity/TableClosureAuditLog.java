@@ -46,6 +46,10 @@ public class TableClosureAuditLog extends BaseEntity {
 	@Column(length = 1000)
 	private String note;
 
+	@Column(name = "balance_disposition", length = 32)
+	@Enumerated(EnumType.STRING)
+	private TableClosureBalanceDisposition balanceDisposition;
+
 	public UUID getRestaurantId() {
 		return restaurantId;
 	}
@@ -124,5 +128,13 @@ public class TableClosureAuditLog extends BaseEntity {
 
 	public void setNote(String note) {
 		this.note = note;
+	}
+
+	public TableClosureBalanceDisposition getBalanceDisposition() {
+		return balanceDisposition;
+	}
+
+	public void setBalanceDisposition(TableClosureBalanceDisposition balanceDisposition) {
+		this.balanceDisposition = balanceDisposition;
 	}
 }

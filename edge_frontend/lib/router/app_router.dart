@@ -15,6 +15,7 @@ import '../setup/setup_wizard_screen.dart';
 GoRouter createAppRouter({
   required AuthSession auth,
   required String edgeBaseUrl,
+  required String cloudBaseUrl,
   required String demoRestaurantId,
   required String demoProductId,
 }) {
@@ -74,8 +75,11 @@ GoRouter createAppRouter({
           final r = state.uri.queryParameters['r'] ?? '';
           final t = state.uri.queryParameters['t'] ?? '';
           final k = state.uri.queryParameters['k'] ?? '';
+          final viaCloud = state.uri.queryParameters['via'] == 'cloud';
           return GuestQrMenuScreen(
-            edgeBaseUrl: edgeBaseUrl,
+            guestApiBaseUrl: viaCloud ? cloudBaseUrl : edgeBaseUrl,
+            realtimeBaseUrl: edgeBaseUrl,
+            useCloudGuestApi: viaCloud,
             restaurantId: r,
             tableId: t,
             token: k,
