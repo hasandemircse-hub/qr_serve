@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 
 String _root(String edgeBaseUrl) {
@@ -14,6 +15,31 @@ Map<String, String> _headers(String? accessToken, {bool jsonBody = false}) {
     h['Authorization'] = 'Bearer $accessToken';
   }
   return h;
+}
+
+String _apiErrorMessage(http.Response res, String fallback) {
+  try {
+    final m = jsonDecode(res.body) as Map<String, dynamic>;
+    final msg = m['message'] as String?;
+    if (msg != null && msg.isNotEmpty) return msg;
+    final err = m['error'] as String?;
+    if (err != null && err.isNotEmpty) return err;
+  } catch (_) {}
+  final body = res.body.trim();
+  if (body.isNotEmpty && body.length < 300) return body;
+  return fallback;
+}
+
+String _ensureImageFilename(String filename) {
+  final name = filename.trim().isEmpty ? 'upload.jpg' : filename.trim();
+  final lower = name.toLowerCase();
+  if (lower.endsWith('.png') ||
+      lower.endsWith('.webp') ||
+      lower.endsWith('.jpg') ||
+      lower.endsWith('.jpeg')) {
+    return name;
+  }
+  return '$name.jpg';
 }
 
 String _restaurantPath(
@@ -196,6 +222,67 @@ Future<void> reorderMenus({
   }
 }
 
+Future<AdminProductDetailDto> uploadProductImage({
+  required String edgeBaseUrl,
+  required String? accessToken,
+  required String restaurantId,
+  required String productId,
+  required List<int> bytes,
+  required String filename,
+}) async {
+  final uri = Uri.parse(
+    _restaurantPath(edgeBaseUrl, restaurantId, '/products/$productId/image'),
+  );
+  final safeName = _ensureImageFilename(filename);
+  final request = http.MultipartRequest('POST', uri);
+  if (accessToken != null && accessToken.isNotEmpty) {
+    request.headers['Authorization'] = 'Bearer $accessToken';
+  }
+  request.files.add(
+    http.MultipartFile.fromBytes(
+      'file',
+      bytes,
+      filename: safeName,
+    ),
+  );
+  final streamed = await request.send();
+  final res = await http.Response.fromStream(streamed);
+  if (res.statusCode != 200) {
+    throw Exception(
+      'Resim yüklenemedi (${res.statusCode}): '
+      '${_apiErrorMessage(res, 'Bilinmeyen hata')}',
+    );
+  }
+  return AdminProductDetailDto.fromJson(
+    jsonDecode(res.body) as Map<String, dynamic>,
+  );
+}
+
+Future<void> deleteProductImage({
+  required String edgeBaseUrl,
+  required String? accessToken,
+  required String restaurantId,
+  required String productId,
+}) async {
+  final uri = Uri.parse(
+    _restaurantPath(edgeBaseUrl, restaurantId, '/products/$productId/image'),
+  );
+  final res = await http.delete(uri, headers: _headers(accessToken));
+  if (res.statusCode != 204) {
+    throw Exception('Resim silinemedi (${res.statusCode}): ${res.body}');
+  }
+}
+
+Future<PlatformFile?> pickProductImageFile() async {
+  final result = await FilePicker.platform.pickFiles(
+    type: FileType.image,
+    allowMultiple: false,
+    withData: true,
+  );
+  if (result == null || result.files.isEmpty) return null;
+  return result.files.single;
+}
+
 Future<void> reorderProducts({
   required String edgeBaseUrl,
   required String? accessToken,
@@ -300,6 +387,7 @@ class AdminProductDetailDto {
     this.sku,
     this.taxRate,
     required this.sortIndex,
+    this.imageUrl,
   });
 
   final String id;
@@ -309,6 +397,20 @@ class AdminProductDetailDto {
   final String? sku;
   final double? taxRate;
   final int sortIndex;
+  final String? imageUrl;
+
+  AdminProductDetailDto copyWith({String? imageUrl, int? sortIndex}) {
+    return AdminProductDetailDto(
+      id: id,
+      name: name,
+      description: description,
+      price: price,
+      sku: sku,
+      taxRate: taxRate,
+      sortIndex: sortIndex ?? this.sortIndex,
+      imageUrl: imageUrl ?? this.imageUrl,
+    );
+  }
 
   factory AdminProductDetailDto.fromJson(Map<String, dynamic> j) {
     return AdminProductDetailDto(
@@ -319,6 +421,7 @@ class AdminProductDetailDto {
       sku: j['sku'] as String?,
       taxRate: j['taxRate'] == null ? null : (j['taxRate'] as num).toDouble(),
       sortIndex: (j['sortIndex'] as num?)?.toInt() ?? 0,
+      imageUrl: j['imageUrl'] as String?,
     );
   }
 }

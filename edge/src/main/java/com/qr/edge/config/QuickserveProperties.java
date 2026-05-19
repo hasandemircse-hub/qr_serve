@@ -22,6 +22,8 @@ public class QuickserveProperties {
 
 	private final Demo demo = new Demo();
 
+	private final Media media = new Media();
+
 	/** QR PDF ve misafir linklerinde kullanılacak Edge'in dışarıdan erişilen taban URL'i. */
 	private String publicEdgeUrl = "http://127.0.0.1:8081";
 
@@ -106,6 +108,33 @@ public class QuickserveProperties {
 
 	public Demo getDemo() {
 		return demo;
+	}
+
+	public Media getMedia() {
+		return media;
+	}
+
+	public static class Media {
+
+		private String productImagesDir = "./data/product-images";
+
+		private long maxImageBytes = 2_097_152L;
+
+		public String getProductImagesDir() {
+			return productImagesDir;
+		}
+
+		public void setProductImagesDir(String productImagesDir) {
+			this.productImagesDir = productImagesDir;
+		}
+
+		public long getMaxImageBytes() {
+			return maxImageBytes;
+		}
+
+		public void setMaxImageBytes(long maxImageBytes) {
+			this.maxImageBytes = maxImageBytes;
+		}
 	}
 
 	public static class Demo {

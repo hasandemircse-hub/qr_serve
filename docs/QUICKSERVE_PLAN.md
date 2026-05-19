@@ -1,6 +1,6 @@
 # QuickServe — Canlı Ürün ve Teknik Plan
 
-**Son güncelleme:** 2026-05-18  
+**Son güncelleme:** 2026-05-19  
 **Amaç:** Ürün vizyonu, mimari hedefler ve *gerçek kod tabanı durumu* tek yerde; her anlamlı iş sonrası güncellenir. Cursor / AI ve ekip bu dosyayı referans alır.
 
 ---
@@ -42,7 +42,7 @@
 | Özellik | Durum | Not |
 |---------|--------|-----|
 | Mekan tasarımı (kat, sürükle-bırak, birleştir/böl) | **Kısmen** | Kat planı editörü + salon WS (`/ws/v1/layout`); siparişte masa **OCCUPIED**. QR **yenile/iptal** (`guest-tokens`). |
-| Gelişmiş menü (ürün/grup, sıra, resim, notlar) | **Kısmen** | Menü/ürün CRUD + **sürükle-bırak sıralama** (menü, ürün, seçenek grubu/seçenek). Resim yükleme **eksik**. |
+| Gelişmiş menü (ürün/grup, sıra, resim, notlar) | **Kısmen** | Menü/ürün CRUD + **sürükle-bırak sıralama** + **ürün resmi** (JPEG/PNG/WebP, `V19`, `POST/DELETE …/image`, public `GET …/media/product-images/…`; admin yükle/kaldır; misafir/garson menüde küçük görsel). Notlar **eksik**. |
 | Seçenekli ürünler | **Kısmen** | Misafir + garson: option-wizard API + paylaşılan seçim diyaloğu. Admin: grup/seçenek CRUD (`ProductOptionsAdminController`, `product_options_admin_screen`). |
 | Personel yönetimi | **Yapıldı** | `StaffAdminController` (CRUD + şifre sıfırlama); `staff_admin_screen` Personel sekmesi; son admin / kendi hesap silme koruması. |
 | QR masa yönetimi | **Kısmen** | PDF/URL + telefon QR; **rotate** / **revoke-all** token API + Kat planı **QR yenile / QR iptal**. |
@@ -178,6 +178,7 @@
 
 | Tarih | Özet | Modül |
 |-------|------|--------|
+| 2026-05-19 | Ürün resmi: `products.image_path` (V19), `ProductImageService` + public media endpoint; admin `POST/DELETE …/products/{id}/image`; `imageUrl` misafir/garson/admin menü DTO’larında; Flutter admin (yükle/kaldır + küçük resim), misafir QR ve garson menü kartlarında görsel. | common, edge, edge_frontend, docs |
 | 2026-05-19 | Menü sıralama: `sort_index` (V18) menü/ürün; `PUT …/reorder` API’leri; admin Menü + Seçenekler ekranında sürükle-bırak. | common, edge, edge_frontend, docs |
 | 2026-05-19 | Garson servis çıkışı: `POST …/waiter/orders/{id}/lines/{id}/delivered` → `KitchenLineStatus.DELIVERED`; hazır paneli Edge’e yazar. | edge, common, edge_frontend, docs |
 | 2026-05-19 | Masa devret: `TableOrderTransferService`, `POST /api/v1/waiter/tables/transfer-orders`; garson masa kartı menüsü. | edge, edge_frontend, docs |

@@ -867,6 +867,7 @@ class _WaiterTableOrderPanelState extends State<_WaiterTableOrderPanel> {
                     ),
                     for (final p in m.products)
                       ListTile(
+                        leading: _MenuProductThumb(imageUrl: p.imageUrl),
                         title: Text(p.name),
                         subtitle: Text('${p.price.toStringAsFixed(2)} ₺'),
                         trailing: IconButton(
@@ -889,6 +890,30 @@ class _WaiterTableOrderPanelState extends State<_WaiterTableOrderPanel> {
         ),
       ],
     );
+  }
+}
+
+class _MenuProductThumb extends StatelessWidget {
+  const _MenuProductThumb({this.imageUrl});
+
+  final String? imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = imageUrl;
+    if (url != null && url.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.network(
+          url,
+          width: 44,
+          height: 44,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => const Icon(Icons.fastfood_outlined),
+        ),
+      );
+    }
+    return const Icon(Icons.fastfood_outlined);
   }
 }
 

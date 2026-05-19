@@ -358,11 +358,18 @@ class _GuestMenu {
 }
 
 class _GuestProduct {
-  _GuestProduct({required this.id, required this.name, this.description, required this.price});
+  _GuestProduct({
+    required this.id,
+    required this.name,
+    this.description,
+    required this.price,
+    this.imageUrl,
+  });
   final String id;
   final String name;
   final String? description;
   final double price;
+  final String? imageUrl;
 
   factory _GuestProduct.fromJson(Map<String, dynamic> j) {
     return _GuestProduct(
@@ -370,6 +377,7 @@ class _GuestProduct {
       name: j['name'] as String? ?? '',
       description: j['description'] as String?,
       price: (j['price'] as num?)?.toDouble() ?? 0,
+      imageUrl: j['imageUrl'] as String?,
     );
   }
 }
@@ -406,16 +414,58 @@ class _MenuTab extends StatelessWidget {
           for (final p in m.products)
             Card(
               margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                title: Text(p.name),
-                subtitle: p.description != null && p.description!.isNotEmpty
-                    ? Text(p.description!, maxLines: 2, overflow: TextOverflow.ellipsis)
-                    : null,
-                trailing: Text(
-                  '${p.price.toStringAsFixed(2)} ₺',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
                 onTap: () => onProduct(p),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (p.imageUrl != null && p.imageUrl!.isNotEmpty)
+                      Image.network(
+                        p.imageUrl!,
+                        width: 88,
+                        height: 88,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const SizedBox(
+                          width: 88,
+                          height: 88,
+                          child: Icon(Icons.broken_image_outlined),
+                        ),
+                      ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              p.name,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            if (p.description != null &&
+                                p.description!.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  p.description!,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '${p.price.toStringAsFixed(2)} ₺',
+                              style: const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           const SizedBox(height: 12),

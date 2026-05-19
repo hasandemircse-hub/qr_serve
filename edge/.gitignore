@@ -31,3 +31,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Product images (runtime upload dir) ###
+data/product-images/

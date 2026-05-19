@@ -433,6 +433,64 @@ class _MenuAdminScreenState extends State<MenuAdminScreen> {
     }
   }
 
+  void _updateLocalProduct(AdminProductDetailDto updated) {
+    final menuIdx = _localMenus.indexWhere(
+      (m) => m.products.any((p) => p.id == updated.id),
+    );
+    if (menuIdx < 0) return;
+    final menu = _localMenus[menuIdx];
+    final products = menu.products
+        .map((p) => p.id == updated.id ? updated : p)
+        .toList();
+    setState(() {
+      _localMenus[menuIdx] = menu.copyWith(products: products);
+    });
+  }
+
+  Future<void> _pickAndUploadImage(AdminProductDetailDto product) async {
+    if (_busy) return;
+    final file = await pickProductImageFile();
+    if (file == null || file.bytes == null) return;
+    setState(() => _busy = true);
+    try {
+      final updated = await uploadProductImage(
+        edgeBaseUrl: widget.edgeBaseUrl,
+        accessToken: widget.accessToken,
+        restaurantId: widget.restaurantId,
+        productId: product.id,
+        bytes: file.bytes!,
+        filename: file.name,
+      );
+      if (!mounted) return;
+      _updateLocalProduct(updated);
+      _toast('Ürün resmi yüklendi');
+    } catch (e) {
+      _toast('$e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _removeProductImage(AdminProductDetailDto product) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await deleteProductImage(
+        edgeBaseUrl: widget.edgeBaseUrl,
+        accessToken: widget.accessToken,
+        restaurantId: widget.restaurantId,
+        productId: product.id,
+      );
+      if (!mounted) return;
+      _updateLocalProduct(product.copyWith(imageUrl: null));
+      _toast('Ürün resmi kaldırıldı');
+    } catch (e) {
+      _toast('$e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _deleteProduct(AdminProductDetailDto product) async {
     if (_busy || !await _confirmDelete('“${product.name}” ürünü')) return;
     setState(() => _busy = true);
@@ -622,9 +680,16 @@ class _MenuAdminScreenState extends State<MenuAdminScreen> {
                               key: ValueKey(p.id),
                               margin: const EdgeInsets.only(bottom: 8),
                               child: ListTile(
-                                leading: ReorderableDragStartListener(
-                                  index: i,
-                                  child: const Icon(Icons.drag_handle),
+                                leading: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    ReorderableDragStartListener(
+                                      index: i,
+                                      child: const Icon(Icons.drag_handle),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    _ProductThumb(imageUrl: p.imageUrl),
+                                  ],
                                 ),
                                 title: Text(p.name),
                                 subtitle: Text(
@@ -642,22 +707,36 @@ class _MenuAdminScreenState extends State<MenuAdminScreen> {
                                           existing: p,
                                           allMenus: allMenus,
                                         );
+                                      case 'image':
+                                        _pickAndUploadImage(p);
+                                      case 'remove_image':
+                                        _removeProductImage(p);
                                       case 'options':
                                         _openProductOptions(p.id);
                                       case 'delete':
                                         _deleteProduct(p);
                                     }
                                   },
-                                  itemBuilder: (_) => const [
-                                    PopupMenuItem(
+                                  itemBuilder: (_) => [
+                                    const PopupMenuItem(
                                       value: 'edit',
                                       child: Text('Düzenle'),
                                     ),
-                                    PopupMenuItem(
+                                    const PopupMenuItem(
+                                      value: 'image',
+                                      child: Text('Resim yükle'),
+                                    ),
+                                    if (p.imageUrl != null &&
+                                        p.imageUrl!.isNotEmpty)
+                                      const PopupMenuItem(
+                                        value: 'remove_image',
+                                        child: Text('Resmi kaldır'),
+                                      ),
+                                    const PopupMenuItem(
                                       value: 'options',
                                       child: Text('Seçenekler'),
                                     ),
-                                    PopupMenuItem(
+                                    const PopupMenuItem(
                                       value: 'delete',
                                       child: Text('Sil'),
                                     ),
@@ -686,6 +765,50 @@ class _MenuAdminScreenState extends State<MenuAdminScreen> {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _ProductThumb extends StatelessWidget {
+  const _ProductThumb({this.imageUrl});
+
+  final String? imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = imageUrl;
+    if (url != null && url.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.network(
+          url,
+          width: 48,
+          height: 48,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => const _PlaceholderThumb(),
+        ),
+      );
+    }
+    return const _PlaceholderThumb();
+  }
+}
+
+class _PlaceholderThumb extends StatelessWidget {
+  const _PlaceholderThumb();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(
+        Icons.fastfood_outlined,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
     );
   }
 }

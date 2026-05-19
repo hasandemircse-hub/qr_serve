@@ -41,6 +41,9 @@ public class Product extends BaseEntity {
 	@Column(name = "sort_index", nullable = false)
 	private Integer sortIndex = 0;
 
+	@Column(name = "image_path", length = 512)
+	private String imagePath;
+
 	public UUID getMenuId() {
 		return menuId;
 	}
@@ -100,5 +103,13 @@ public class Product extends BaseEntity {
 
 	public void setSortIndex(Integer sortIndex) {
 		this.sortIndex = sortIndex;
+	}
+
+	public String getImagePath() {
+		return imagePath;
+	}
+
+	public void setImagePath(String imagePath) {
+		this.imagePath = imagePath;
 	}
 }

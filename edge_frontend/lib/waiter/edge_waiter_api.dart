@@ -268,12 +268,14 @@ class WaiterMenuProductDto {
     required this.name,
     this.description,
     required this.price,
+    this.imageUrl,
   });
 
   final String id;
   final String name;
   final String? description;
   final double price;
+  final String? imageUrl;
 
   factory WaiterMenuProductDto.fromJson(Map<String, dynamic> j) {
     return WaiterMenuProductDto(
@@ -281,6 +283,7 @@ class WaiterMenuProductDto {
       name: j['name'] as String? ?? '',
       description: j['description'] as String?,
       price: (j['price'] as num?)?.toDouble() ?? 0,
+      imageUrl: j['imageUrl'] as String?,
     );
   }
 }

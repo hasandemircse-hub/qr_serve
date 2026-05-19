@@ -45,19 +45,23 @@ public class MenuAdminService {
 
 	private final ProductOptionRepository productOptionRepository;
 
+	private final ProductImageService productImageService;
+
 	public MenuAdminService(
 			Clock clock,
 			RestaurantRepository restaurantRepository,
 			MenuRepository menuRepository,
 			ProductRepository productRepository,
 			ProductOptionGroupRepository productOptionGroupRepository,
-			ProductOptionRepository productOptionRepository) {
+			ProductOptionRepository productOptionRepository,
+			ProductImageService productImageService) {
 		this.clock = clock;
 		this.restaurantRepository = restaurantRepository;
 		this.menuRepository = menuRepository;
 		this.productRepository = productRepository;
 		this.productOptionGroupRepository = productOptionGroupRepository;
 		this.productOptionRepository = productOptionRepository;
+		this.productImageService = productImageService;
 	}
 
 	public AdminMenuTreeResponse listTree(UUID restaurantId) {
@@ -66,7 +70,7 @@ public class MenuAdminService {
 		for (Menu menu : menuRepository.findByRestaurantIdAndIsDeletedFalseOrderBySortIndexAscNameAsc(restaurantId)) {
 			List<AdminProductDetailDto> products = new ArrayList<>();
 			for (Product p : productRepository.findByMenuIdAndIsDeletedFalseOrderBySortIndexAscNameAsc(menu.getId())) {
-				products.add(toProductDto(p));
+				products.add(toProductDto(restaurantId, p));
 			}
 			menus.add(new AdminMenuDetailDto(
 					menu.getId(),
@@ -193,6 +197,10 @@ public class MenuAdminService {
 		softDeleteProduct(product, LocalDateTime.now(clock));
 	}
 
+	public AdminProductDetailDto getProduct(UUID restaurantId, UUID productId) {
+		return toProductDto(restaurantId, requireProductInRestaurant(restaurantId, productId));
+	}
+
 	private void applyProductFields(Product product, UpsertProductRequest body) {
 		product.setName(body.name().trim());
 		product.setDescription(trimToNull(body.description()));
@@ -243,7 +251,7 @@ public class MenuAdminService {
 				products);
 	}
 
-	private static AdminProductDetailDto toProductDto(Product p) {
+	private AdminProductDetailDto toProductDto(UUID restaurantId, Product p) {
 		return new AdminProductDetailDto(
 				p.getId(),
 				p.getName(),
@@ -251,7 +259,14 @@ public class MenuAdminService {
 				p.getPrice(),
 				p.getSku(),
 				p.getTaxRate(),
-				nullSafeSortIndex(p.getSortIndex()));
+				nullSafeSortIndex(p.getSortIndex()),
+				productImageService.publicImageUrl(restaurantId, p));
+	}
+
+	private AdminProductDetailDto toProductDto(Product p) {
+		Menu menu = menuRepository.findById(p.getMenuId()).orElse(null);
+		UUID restaurantId = menu != null ? menu.getRestaurantId() : null;
+		return toProductDto(restaurantId, p);
 	}
 
 	private int nextMenuSortIndex(UUID restaurantId) {

@@ -35,6 +35,7 @@ import com.qr.edge.guest.api.GuestOrderStatusResponse.Order;
 import com.qr.edge.guest.api.GuestServiceRequestBody;
 import com.qr.edge.guest.api.GuestSessionResponse;
 import com.qr.edge.guest.events.GuestServiceRequestPostedEvent;
+import com.qr.edge.admin.ProductImageService;
 import com.qr.edge.qr.ProductOptionWizardService;
 import com.qr.edge.qr.QrOrderService;
 import com.qr.edge.qr.api.CreateQrOrderRequest;
@@ -69,6 +70,8 @@ public class GuestMenuService {
 
 	private final ApplicationEventPublisher eventPublisher;
 
+	private final ProductImageService productImageService;
+
 	private static final EnumSet<OrderStatus> GUEST_ORDER_STATUS_EXCLUDED = EnumSet.of(
 			OrderStatus.CLOSED,
 			OrderStatus.CANCELLED,
@@ -86,7 +89,8 @@ public class GuestMenuService {
 			OrderLineItemRepository orderLineItemRepository,
 			QrOrderService qrOrderService,
 			ProductOptionWizardService productOptionWizardService,
-			ApplicationEventPublisher eventPublisher) {
+			ApplicationEventPublisher eventPublisher,
+			ProductImageService productImageService) {
 		this.clock = clock;
 		this.tableGuestTokenRepository = tableGuestTokenRepository;
 		this.restaurantRepository = restaurantRepository;
@@ -99,6 +103,7 @@ public class GuestMenuService {
 		this.qrOrderService = qrOrderService;
 		this.productOptionWizardService = productOptionWizardService;
 		this.eventPublisher = eventPublisher;
+		this.productImageService = productImageService;
 	}
 
 	public ProductOptionWizardResponse productOptionWizard(
@@ -140,7 +145,12 @@ public class GuestMenuService {
 			var products = productRepository.findByMenuIdAndIsDeletedFalseOrderBySortIndexAscNameAsc(m.getId());
 			List<GuestMenuProductDto> pd = new ArrayList<>();
 			for (var p : products) {
-				pd.add(new GuestMenuProductDto(p.getId(), p.getName(), p.getDescription(), p.getPrice()));
+				pd.add(new GuestMenuProductDto(
+						p.getId(),
+						p.getName(),
+						p.getDescription(),
+						p.getPrice(),
+						productImageService.publicImageUrl(restaurantId, p)));
 			}
 			out.add(new GuestMenuMenuDto(m.getId(), m.getName(), pd));
 		}

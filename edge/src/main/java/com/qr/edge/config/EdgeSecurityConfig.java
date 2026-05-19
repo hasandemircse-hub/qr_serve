@@ -63,6 +63,7 @@ public class EdgeSecurityConfig {
 						.requestMatchers("/api/v1/sync/**").permitAll()
 						.requestMatchers("/api/v1/setup/**").permitAll()
 						.requestMatchers("/api/v1/guest/**").permitAll()
+						.requestMatchers("/api/v1/media/product-images/**").permitAll()
 						.requestMatchers("/r/**").permitAll()
 						.requestMatchers("/guest/**").permitAll()
 						.requestMatchers("/api/v1/edge/info").permitAll()

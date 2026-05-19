@@ -22,6 +22,7 @@ public record AdminMenuTreeResponse(List<AdminMenuDetailDto> menus) {
 			BigDecimal price,
 			String sku,
 			BigDecimal taxRate,
-			int sortIndex) {
+			int sortIndex,
+			String imageUrl) {
 	}
 }

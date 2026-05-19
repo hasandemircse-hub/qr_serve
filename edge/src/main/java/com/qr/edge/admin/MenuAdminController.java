@@ -4,6 +4,7 @@ import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -11,8 +12,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.qr.edge.admin.api.AdminMenuTreeResponse;
 import com.qr.edge.admin.api.AdminMenuTreeResponse.AdminMenuDetailDto;
@@ -29,8 +32,11 @@ public class MenuAdminController {
 
 	private final MenuAdminService menuAdminService;
 
-	public MenuAdminController(MenuAdminService menuAdminService) {
+	private final ProductImageService productImageService;
+
+	public MenuAdminController(MenuAdminService menuAdminService, ProductImageService productImageService) {
 		this.menuAdminService = menuAdminService;
+		this.productImageService = productImageService;
 	}
 
 	@GetMapping("/menus/tree")
@@ -105,5 +111,22 @@ public class MenuAdminController {
 	@PreAuthorize("@edgeAuth.isRestaurantAdmin(authentication, #restaurantId)")
 	public void deleteProduct(@PathVariable UUID restaurantId, @PathVariable UUID productId) {
 		menuAdminService.deleteProduct(restaurantId, productId);
+	}
+
+	@PostMapping(value = "/products/{productId}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	@PreAuthorize("@edgeAuth.isRestaurantAdmin(authentication, #restaurantId)")
+	public AdminProductDetailDto uploadProductImage(
+			@PathVariable UUID restaurantId,
+			@PathVariable UUID productId,
+			@RequestParam("file") MultipartFile file) {
+		productImageService.uploadImage(restaurantId, productId, file);
+		return menuAdminService.getProduct(restaurantId, productId);
+	}
+
+	@DeleteMapping("/products/{productId}/image")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	@PreAuthorize("@edgeAuth.isRestaurantAdmin(authentication, #restaurantId)")
+	public void deleteProductImage(@PathVariable UUID restaurantId, @PathVariable UUID productId) {
+		productImageService.deleteImage(restaurantId, productId);
 	}
 }
