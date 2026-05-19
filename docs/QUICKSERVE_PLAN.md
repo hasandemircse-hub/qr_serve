@@ -42,7 +42,7 @@
 | Özellik | Durum | Not |
 |---------|--------|-----|
 | Mekan tasarımı (kat, sürükle-bırak, birleştir/böl) | **Kısmen** | Kat planı editörü + salon WS (`/ws/v1/layout`); siparişte masa **OCCUPIED**. QR **yenile/iptal** (`guest-tokens`). |
-| Gelişmiş menü (ürün/grup, sıra, resim, notlar) | **Kısmen** | `MenuAdminController` menü/ürün CRUD; `menu_admin_screen` Menü sekmesi. Resim yükleme ve sıralama **eksik**. |
+| Gelişmiş menü (ürün/grup, sıra, resim, notlar) | **Kısmen** | Menü/ürün CRUD + **sürükle-bırak sıralama** (menü, ürün, seçenek grubu/seçenek). Resim yükleme **eksik**. |
 | Seçenekli ürünler | **Kısmen** | Misafir + garson: option-wizard API + paylaşılan seçim diyaloğu. Admin: grup/seçenek CRUD (`ProductOptionsAdminController`, `product_options_admin_screen`). |
 | Personel yönetimi | **Yapıldı** | `StaffAdminController` (CRUD + şifre sıfırlama); `staff_admin_screen` Personel sekmesi; son admin / kendi hesap silme koruması. |
 | QR masa yönetimi | **Kısmen** | PDF/URL + telefon QR; **rotate** / **revoke-all** token API + Kat planı **QR yenile / QR iptal**. |
@@ -53,7 +53,7 @@
 
 | Rol | Durum | Not |
 |-----|--------|-----|
-| Garson | **Kısmen** | Masa→menü→sepet→sipariş; seçenekli ürün. **Salon haritası** (`WaiterFloorMapScreen`, layout WS). Hazır satır + WS push. |
+| Garson | **Kısmen** | Masa→menü→sepet→sipariş; salon haritası; **masa devret**; hazır satır + **servis çıkışı** (`DELIVERED` API). |
 | Mutfak | **Kısmen** | Kuyruk + received/ready + mutfak WS; `LINE_KITCHEN_STATUS` garsona da push. |
 | Kasiyer | **Kısmen** | Açık adisyon + ödeme + kasa WS; masa kapat (standart / zorla / bakiye bırak). **Tümü / tutar / satır** tahsilat UI; iade Detay’dan. |
 
@@ -103,7 +103,7 @@
 |---------|-------------|-----------------|
 | **Zorunlu kapat (force)** | Müşteri ayrıldı, hesap ödenmeyecek / şikâyet | Restoran admini açık bakiye ile kapatabilir; audit’te `remaining_principal` + `balance_disposition` (`VOID` / `WRITE_OFF`). Kasa zorla kapat diyaloğunda seçim. |
 | **Bakiye bırakarak kapat** | Kurumsal hesap, sonradan fatura | Masa serbest; sipariş `OPEN` veya `DEFERRED` kalır; Cloud sync’e işaret. |
-| **Masayı devret** | Yanlış masa, birleştirme | Aktif oturum hedef masaya taşınır; kaynak masa kapanır. |
+| **Masayı devret** | Yanlış masa, birleştirme | **Yapıldı:** `POST /waiter/tables/transfer-orders`. |
 | **Kısmi ödeme sonrası kapat** | Nakit yetmedi, kalan silindi | Kalan tutar indirim/iptal kodu; kapatma onayı. |
 | **Garson / yönetici kapat** | Kasa meşgul, servis masayı boşalttı | Rol bazlı endpoint; kasa dışı UI veya PIN onayı. |
 
@@ -178,6 +178,9 @@
 
 | Tarih | Özet | Modül |
 |-------|------|--------|
+| 2026-05-19 | Menü sıralama: `sort_index` (V18) menü/ürün; `PUT …/reorder` API’leri; admin Menü + Seçenekler ekranında sürükle-bırak. | common, edge, edge_frontend, docs |
+| 2026-05-19 | Garson servis çıkışı: `POST …/waiter/orders/{id}/lines/{id}/delivered` → `KitchenLineStatus.DELIVERED`; hazır paneli Edge’e yazar. | edge, common, edge_frontend, docs |
+| 2026-05-19 | Masa devret: `TableOrderTransferService`, `POST /api/v1/waiter/tables/transfer-orders`; garson masa kartı menüsü. | edge, edge_frontend, docs |
 | 2026-05-18 | Garson salon haritası: `WaiterFloorMapScreen` + layout REST/WS; masa dokun → sipariş. | edge_frontend, docs |
 | 2026-05-18 | Bakiye raporu: `GET /cashier/balance-report` (DEFERRED + audit); `ClosureBalanceReportScreen` kasa + admin. | edge, edge_frontend, common, docs |
 | 2026-05-18 | Kasa satır bazlı ödeme: ödeme sheet’inde **Satır** modu, çoklu satır seçimi + `PRODUCT_LINES` API. | edge_frontend, docs |

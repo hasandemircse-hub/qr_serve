@@ -10,9 +10,9 @@ import com.qr.common.persistence.entity.Menu;
 
 public interface MenuRepository extends JpaRepository<Menu, UUID> {
 
-	List<Menu> findByRestaurantIdAndIsDeletedFalseAndActiveTrueOrderByNameAsc(UUID restaurantId);
+	List<Menu> findByRestaurantIdAndIsDeletedFalseAndActiveTrueOrderBySortIndexAscNameAsc(UUID restaurantId);
 
-	List<Menu> findByRestaurantIdAndIsDeletedFalseOrderByNameAsc(UUID restaurantId);
+	List<Menu> findByRestaurantIdAndIsDeletedFalseOrderBySortIndexAscNameAsc(UUID restaurantId);
 
 	List<Menu> findByUpdatedAtAfter(LocalDateTime watermark);
 }

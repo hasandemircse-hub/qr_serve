@@ -4,7 +4,9 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -24,6 +26,7 @@ import com.qr.common.persistence.repository.RestaurantRepository;
 import com.qr.edge.admin.api.AdminMenuTreeResponse;
 import com.qr.edge.admin.api.AdminMenuTreeResponse.AdminMenuDetailDto;
 import com.qr.edge.admin.api.AdminMenuTreeResponse.AdminProductDetailDto;
+import com.qr.edge.admin.api.ReorderIdsRequest;
 import com.qr.edge.admin.api.UpsertMenuRequest;
 import com.qr.edge.admin.api.UpsertProductRequest;
 
@@ -60,9 +63,9 @@ public class MenuAdminService {
 	public AdminMenuTreeResponse listTree(UUID restaurantId) {
 		requireRestaurant(restaurantId);
 		List<AdminMenuDetailDto> menus = new ArrayList<>();
-		for (Menu menu : menuRepository.findByRestaurantIdAndIsDeletedFalseOrderByNameAsc(restaurantId)) {
+		for (Menu menu : menuRepository.findByRestaurantIdAndIsDeletedFalseOrderBySortIndexAscNameAsc(restaurantId)) {
 			List<AdminProductDetailDto> products = new ArrayList<>();
-			for (Product p : productRepository.findByMenuIdAndIsDeletedFalseOrderByNameAsc(menu.getId())) {
+			for (Product p : productRepository.findByMenuIdAndIsDeletedFalseOrderBySortIndexAscNameAsc(menu.getId())) {
 				products.add(toProductDto(p));
 			}
 			menus.add(new AdminMenuDetailDto(
@@ -70,6 +73,7 @@ public class MenuAdminService {
 					menu.getName(),
 					menu.getDescription(),
 					Boolean.TRUE.equals(menu.getActive()),
+					nullSafeSortIndex(menu.getSortIndex()),
 					products));
 		}
 		return new AdminMenuTreeResponse(menus);
@@ -83,9 +87,16 @@ public class MenuAdminService {
 		menu.setName(body.name().trim());
 		menu.setDescription(trimToNull(body.description()));
 		menu.setActive(body.active() == null || body.active());
+		menu.setSortIndex(nextMenuSortIndex(restaurantId));
 		menu.assignIdIfAbsent();
 		menuRepository.save(menu);
-		return new AdminMenuDetailDto(menu.getId(), menu.getName(), menu.getDescription(), menu.getActive(), List.of());
+		return new AdminMenuDetailDto(
+				menu.getId(),
+				menu.getName(),
+				menu.getDescription(),
+				menu.getActive(),
+				menu.getSortIndex(),
+				List.of());
 	}
 
 	@Transactional
@@ -108,9 +119,46 @@ public class MenuAdminService {
 		menu.setIsDeleted(true);
 		menu.setUpdatedAt(now);
 		menuRepository.save(menu);
-		for (Product product : productRepository.findByMenuIdAndIsDeletedFalseOrderByNameAsc(menuId)) {
+		for (Product product : productRepository.findByMenuIdAndIsDeletedFalseOrderBySortIndexAscNameAsc(menuId)) {
 			softDeleteProduct(product, now);
 		}
+	}
+
+	@Transactional
+	public void reorderMenus(UUID restaurantId, ReorderIdsRequest request) {
+		requireRestaurant(restaurantId);
+		applySortOrder(
+				menuRepository.findByRestaurantIdAndIsDeletedFalseOrderBySortIndexAscNameAsc(restaurantId).stream()
+						.map(Menu::getId)
+						.toList(),
+				request.orderedIds(),
+				(index, id) -> {
+					Menu menu = requireMenuInRestaurant(restaurantId, id);
+					menu.setSortIndex(index);
+					menu.setUpdatedAt(LocalDateTime.now(clock));
+					menuRepository.save(menu);
+				});
+	}
+
+	@Transactional
+	public void reorderProducts(UUID restaurantId, UUID menuId, ReorderIdsRequest request) {
+		requireMenuInRestaurant(restaurantId, menuId);
+		applySortOrder(
+				productRepository.findByMenuIdAndIsDeletedFalseOrderBySortIndexAscNameAsc(menuId).stream()
+						.map(Product::getId)
+						.toList(),
+				request.orderedIds(),
+				(index, id) -> {
+					Product product = requireProductInRestaurant(restaurantId, id);
+					if (!product.getMenuId().equals(menuId)) {
+						throw new ResponseStatusException(
+								HttpStatus.BAD_REQUEST,
+								"Product does not belong to menu");
+					}
+					product.setSortIndex(index);
+					product.setUpdatedAt(LocalDateTime.now(clock));
+					productRepository.save(product);
+				});
 	}
 
 	@Transactional
@@ -119,6 +167,7 @@ public class MenuAdminService {
 		Product product = new Product();
 		product.setMenuId(menuId);
 		applyProductFields(product, body);
+		product.setSortIndex(nextProductSortIndex(menuId));
 		product.assignIdIfAbsent();
 		productRepository.save(product);
 		return toProductDto(product);
@@ -130,6 +179,7 @@ public class MenuAdminService {
 		if (body.menuId() != null && !body.menuId().equals(product.getMenuId())) {
 			requireMenuInRestaurant(restaurantId, body.menuId());
 			product.setMenuId(body.menuId());
+			product.setSortIndex(nextProductSortIndex(body.menuId()));
 		}
 		applyProductFields(product, body);
 		product.setUpdatedAt(LocalDateTime.now(clock));
@@ -181,7 +231,7 @@ public class MenuAdminService {
 
 	private AdminMenuDetailDto toMenuDto(Menu menu) {
 		List<AdminProductDetailDto> products = new ArrayList<>();
-		for (Product p : productRepository.findByMenuIdAndIsDeletedFalseOrderByNameAsc(menu.getId())) {
+		for (Product p : productRepository.findByMenuIdAndIsDeletedFalseOrderBySortIndexAscNameAsc(menu.getId())) {
 			products.add(toProductDto(p));
 		}
 		return new AdminMenuDetailDto(
@@ -189,6 +239,7 @@ public class MenuAdminService {
 				menu.getName(),
 				menu.getDescription(),
 				Boolean.TRUE.equals(menu.getActive()),
+				nullSafeSortIndex(menu.getSortIndex()),
 				products);
 	}
 
@@ -199,7 +250,36 @@ public class MenuAdminService {
 				p.getDescription(),
 				p.getPrice(),
 				p.getSku(),
-				p.getTaxRate());
+				p.getTaxRate(),
+				nullSafeSortIndex(p.getSortIndex()));
+	}
+
+	private int nextMenuSortIndex(UUID restaurantId) {
+		return menuRepository.findByRestaurantIdAndIsDeletedFalseOrderBySortIndexAscNameAsc(restaurantId).size();
+	}
+
+	private int nextProductSortIndex(UUID menuId) {
+		return productRepository.findByMenuIdAndIsDeletedFalseOrderBySortIndexAscNameAsc(menuId).size();
+	}
+
+	private static int nullSafeSortIndex(Integer sortIndex) {
+		return sortIndex != null ? sortIndex : 0;
+	}
+
+	private static void applySortOrder(
+			List<UUID> existingIds,
+			List<UUID> orderedIds,
+			java.util.function.BiConsumer<Integer, UUID> apply) {
+		if (orderedIds.size() != existingIds.size()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "orderedIds must include all items");
+		}
+		Set<UUID> existing = new HashSet<>(existingIds);
+		if (!existing.equals(new HashSet<>(orderedIds))) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "orderedIds mismatch");
+		}
+		for (int i = 0; i < orderedIds.size(); i++) {
+			apply.accept(i, orderedIds.get(i));
+		}
 	}
 
 	private void requireRestaurant(UUID restaurantId) {

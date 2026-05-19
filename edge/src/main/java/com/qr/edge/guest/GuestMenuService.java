@@ -134,10 +134,10 @@ public class GuestMenuService {
 		restaurantRepository.findById(restaurantId)
 				.filter(r -> !Boolean.TRUE.equals(r.getIsDeleted()))
 				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Restaurant not found"));
-		var menus = menuRepository.findByRestaurantIdAndIsDeletedFalseAndActiveTrueOrderByNameAsc(restaurantId);
+		var menus = menuRepository.findByRestaurantIdAndIsDeletedFalseAndActiveTrueOrderBySortIndexAscNameAsc(restaurantId);
 		List<GuestMenuMenuDto> out = new ArrayList<>();
 		for (var m : menus) {
-			var products = productRepository.findByMenuIdAndIsDeletedFalseOrderByNameAsc(m.getId());
+			var products = productRepository.findByMenuIdAndIsDeletedFalseOrderBySortIndexAscNameAsc(m.getId());
 			List<GuestMenuProductDto> pd = new ArrayList<>();
 			for (var p : products) {
 				pd.add(new GuestMenuProductDto(p.getId(), p.getName(), p.getDescription(), p.getPrice()));

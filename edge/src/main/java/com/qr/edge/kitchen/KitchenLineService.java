@@ -12,6 +12,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.qr.common.persistence.entity.KitchenLineStatus;
 import com.qr.common.persistence.entity.OrderLineItem;
+import com.qr.common.persistence.entity.OrderStatus;
 import com.qr.common.persistence.entity.RestaurantOrder;
 import com.qr.common.persistence.repository.OrderLineItemRepository;
 import com.qr.common.persistence.repository.RestaurantOrderRepository;
@@ -71,5 +72,40 @@ public class KitchenLineService {
 		orderLineItemRepository.save(line);
 		eventPublisher.publishEvent(new KitchenLineReadyEvent(order.getId(), lineId));
 		eventPublisher.publishEvent(new KitchenLineGuestNotifyEvent(order.getId(), lineId));
+	}
+
+	@Transactional
+	public void markLineDelivered(UUID restaurantId, UUID orderId, UUID lineId) {
+		RestaurantOrder order = restaurantOrderRepository.findByIdAndRestaurantId(orderId, restaurantId)
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+		OrderLineItem line = orderLineItemRepository.findById(lineId)
+				.filter(l -> l.getOrderId().equals(order.getId()))
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Line not found"));
+		if (line.getKitchenLineStatus() != KitchenLineStatus.READY) {
+			throw new ResponseStatusException(
+					HttpStatus.BAD_REQUEST,
+					"Line must be READY before delivery");
+		}
+		line.setKitchenLineStatus(KitchenLineStatus.DELIVERED);
+		line.setUpdatedAt(LocalDateTime.now(clock));
+		orderLineItemRepository.save(line);
+		eventPublisher.publishEvent(new KitchenLineGuestNotifyEvent(order.getId(), lineId));
+		maybeMarkOrderServed(order);
+	}
+
+	private void maybeMarkOrderServed(RestaurantOrder order) {
+		boolean allDelivered = orderLineItemRepository.findByOrderIdOrderByCreatedAtAsc(order.getId()).stream()
+				.filter(li -> !Boolean.TRUE.equals(li.getIsDeleted()))
+				.allMatch(li -> li.getKitchenLineStatus() == KitchenLineStatus.DELIVERED);
+		if (!allDelivered) {
+			return;
+		}
+		if (order.getStatus() == OrderStatus.OPEN
+				|| order.getStatus() == OrderStatus.IN_PROGRESS
+				|| order.getStatus() == OrderStatus.READY) {
+			order.setStatus(OrderStatus.SERVED);
+			order.setUpdatedAt(LocalDateTime.now(clock));
+			restaurantOrderRepository.save(order);
+		}
 	}
 }

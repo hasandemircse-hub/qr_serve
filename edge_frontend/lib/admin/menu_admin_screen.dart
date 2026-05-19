@@ -22,14 +22,17 @@ class MenuAdminScreen extends StatefulWidget {
 }
 
 class _MenuAdminScreenState extends State<MenuAdminScreen> {
-  late Future<AdminMenuTreePayload> _future;
+  AdminMenuTreePayload? _tree;
+  List<AdminMenuDetailDto> _localMenus = [];
+  Object? _loadError;
+  bool _loading = true;
   String? _selectedMenuId;
   bool _busy = false;
 
   @override
   void initState() {
     super.initState();
-    _future = _load();
+    _refresh();
   }
 
   Future<AdminMenuTreePayload> _load() {
@@ -40,17 +43,37 @@ class _MenuAdminScreenState extends State<MenuAdminScreen> {
     );
   }
 
-  Future<void> _refresh() async {
-    setState(() => _future = _load());
-    final tree = await _future;
-    if (!mounted) return;
+  void _applyTree(AdminMenuTreePayload tree) {
+    final menus = List<AdminMenuDetailDto>.from(tree.menus)
+      ..sort((a, b) => a.sortIndex.compareTo(b.sortIndex));
+    _tree = tree;
+    _localMenus = menus;
     if (_selectedMenuId != null &&
-        tree.menus.every((m) => m.id != _selectedMenuId)) {
+        menus.every((m) => m.id != _selectedMenuId)) {
+      _selectedMenuId = menus.isEmpty ? null : menus.first.id;
+    } else if (_selectedMenuId == null && menus.isNotEmpty) {
+      _selectedMenuId = menus.first.id;
+    }
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
+    try {
+      final tree = await _load();
+      if (!mounted) return;
       setState(() {
-        _selectedMenuId = tree.menus.isEmpty ? null : tree.menus.first.id;
+        _applyTree(tree);
+        _loading = false;
       });
-    } else if (_selectedMenuId == null && tree.menus.isNotEmpty) {
-      setState(() => _selectedMenuId = tree.menus.first.id);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = e;
+        _loading = false;
+      });
     }
   }
 
@@ -60,13 +83,63 @@ class _MenuAdminScreenState extends State<MenuAdminScreen> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  AdminMenuDetailDto? _menu(AdminMenuTreePayload tree) {
+  AdminMenuDetailDto? get _selectedMenu {
     final id = _selectedMenuId;
     if (id == null) return null;
-    for (final m in tree.menus) {
+    for (final m in _localMenus) {
       if (m.id == id) return m;
     }
     return null;
+  }
+
+  Future<void> _persistMenuOrder() async {
+    if (_localMenus.length < 2) return;
+    try {
+      await reorderMenus(
+        edgeBaseUrl: widget.edgeBaseUrl,
+        accessToken: widget.accessToken,
+        restaurantId: widget.restaurantId,
+        orderedIds: _localMenus.map((m) => m.id).toList(),
+      );
+    } catch (e) {
+      _toast('$e');
+      await _refresh();
+    }
+  }
+
+  Future<void> _onReorderMenu(int oldIndex, int newIndex) async {
+    if (newIndex > oldIndex) newIndex -= 1;
+    setState(() {
+      final item = _localMenus.removeAt(oldIndex);
+      _localMenus.insert(newIndex, item);
+    });
+    await _persistMenuOrder();
+  }
+
+  Future<void> _onReorderProduct(int oldIndex, int newIndex) async {
+    final menu = _selectedMenu;
+    if (menu == null || menu.products.length < 2) return;
+    if (newIndex > oldIndex) newIndex -= 1;
+    final products = List<AdminProductDetailDto>.from(menu.products);
+    final item = products.removeAt(oldIndex);
+    products.insert(newIndex, item);
+    final menuIdx = _localMenus.indexWhere((m) => m.id == menu.id);
+    if (menuIdx < 0) return;
+    setState(() {
+      _localMenus[menuIdx] = menu.copyWith(products: products);
+    });
+    try {
+      await reorderProducts(
+        edgeBaseUrl: widget.edgeBaseUrl,
+        accessToken: widget.accessToken,
+        restaurantId: widget.restaurantId,
+        menuId: menu.id,
+        orderedIds: products.map((p) => p.id).toList(),
+      );
+    } catch (e) {
+      _toast('$e');
+      await _refresh();
+    }
   }
 
   Future<bool> _confirmDelete(String label) async {
@@ -394,193 +467,225 @@ class _MenuAdminScreenState extends State<MenuAdminScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<AdminMenuTreePayload>(
-      future: _future,
-      builder: (context, snap) {
-        if (snap.connectionState != ConnectionState.done) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snap.hasError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('Menü yüklenemedi: ${snap.error}'),
-                  const SizedBox(height: 12),
-                  FilledButton(
-                    onPressed: _refresh,
-                    child: const Text('Yeniden dene'),
-                  ),
-                ],
+    if (_loading && _tree == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_loadError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Menü yüklenemedi: $_loadError'),
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: _refresh,
+                child: const Text('Yeniden dene'),
               ),
-            ),
-          );
-        }
-        final tree = snap.data!;
-        if (_selectedMenuId == null && tree.menus.isNotEmpty) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) setState(() => _selectedMenuId = tree.menus.first.id);
-          });
-        }
-        final menu = _menu(tree);
+            ],
+          ),
+        ),
+      );
+    }
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: tree.menus.isEmpty
-                        ? Text(
-                            'Henüz menü yok',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          )
-                        : DropdownButtonFormField<String>(
-                            initialValue: _selectedMenuId,
-                            decoration: const InputDecoration(
-                              labelText: 'Menü',
-                              border: OutlineInputBorder(),
-                              isDense: true,
-                            ),
-                            items: [
-                              for (final m in tree.menus)
-                                DropdownMenuItem(
-                                  value: m.id,
-                                  child: Text(
-                                    m.active ? m.name : '${m.name} (pasif)',
-                                  ),
-                                ),
-                            ],
-                            onChanged: _busy
-                                ? null
-                                : (v) => setState(() => _selectedMenuId = v),
-                          ),
-                  ),
-                  IconButton(
-                    tooltip: 'Menü ekle',
-                    onPressed: _busy ? null : () => _openMenuDialog(),
-                    icon: const Icon(Icons.add_box_outlined),
-                  ),
-                  if (menu != null)
-                    IconButton(
-                      tooltip: 'Menüyü düzenle',
-                      onPressed: _busy ? null : () => _openMenuDialog(existing: menu),
-                      icon: const Icon(Icons.edit_outlined),
-                    ),
-                  if (menu != null)
-                    IconButton(
-                      tooltip: 'Menüyü sil',
-                      onPressed: _busy ? null : () => _deleteMenu(menu),
-                      icon: const Icon(Icons.delete_outline),
-                    ),
-                ],
-              ),
-            ),
-            if (menu != null && !menu.active)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+    final menu = _selectedMenu;
+    final allMenus = _tree?.menus ?? _localMenus;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
+          child: Row(
+            children: [
+              Expanded(
                 child: Text(
-                  'Bu menü pasif — misafir ve garson menüsünde görünmez.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.error,
-                  ),
+                  'Menüler',
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
-            Expanded(
-              child: menu == null
-                  ? Center(
-                      child: FilledButton.icon(
-                        onPressed: _busy ? null : () => _openMenuDialog(),
-                        icon: const Icon(Icons.restaurant_menu),
-                        label: const Text('İlk menüyü oluştur'),
-                      ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _refresh,
-                      child: menu.products.isEmpty
-                          ? ListView(
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              children: const [
-                                SizedBox(height: 48),
-                                Center(child: Text('Bu menüde ürün yok')),
-                              ],
-                            )
-                          : ListView.separated(
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              padding: const EdgeInsets.all(16),
-                              itemCount: menu.products.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(height: 8),
-                              itemBuilder: (ctx, i) {
-                                final p = menu.products[i];
-                                return Card(
-                                  child: ListTile(
-                                    title: Text(p.name),
-                                    subtitle: Text(
-                                      '${p.price.toStringAsFixed(2)} ₺'
-                                      '${p.description != null && p.description!.isNotEmpty ? ' · ${p.description}' : ''}',
-                                    ),
-                                    isThreeLine: p.description != null &&
-                                        p.description!.length > 40,
-                                    trailing: PopupMenuButton<String>(
-                                      onSelected: (action) {
-                                        switch (action) {
-                                          case 'edit':
-                                            _openProductDialog(
-                                              menuId: menu.id,
-                                              existing: p,
-                                              allMenus: tree.menus,
-                                            );
-                                          case 'options':
-                                            _openProductOptions(p.id);
-                                          case 'delete':
-                                            _deleteProduct(p);
-                                        }
-                                      },
-                                      itemBuilder: (_) => const [
-                                        PopupMenuItem(
-                                          value: 'edit',
-                                          child: Text('Düzenle'),
-                                        ),
-                                        PopupMenuItem(
-                                          value: 'options',
-                                          child: Text('Seçenekler'),
-                                        ),
-                                        PopupMenuItem(
-                                          value: 'delete',
-                                          child: Text('Sil'),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                    ),
+              IconButton(
+                tooltip: 'Menü ekle',
+                onPressed: _busy ? null : () => _openMenuDialog(),
+                icon: const Icon(Icons.add_box_outlined),
+              ),
+              if (menu != null)
+                IconButton(
+                  tooltip: 'Menüyü düzenle',
+                  onPressed: _busy ? null : () => _openMenuDialog(existing: menu),
+                  icon: const Icon(Icons.edit_outlined),
+                ),
+              if (menu != null)
+                IconButton(
+                  tooltip: 'Menüyü sil',
+                  onPressed: _busy ? null : () => _deleteMenu(menu),
+                  icon: const Icon(Icons.delete_outline),
+                ),
+            ],
+          ),
+        ),
+        if (_localMenus.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              'Henüz menü yok — ilk menüyü oluşturun.',
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
-            if (menu != null)
-              SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: FilledButton.icon(
-                    onPressed: _busy
+          )
+        else ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              'Sürükleyerek menü sırasını değiştirin; dokunarak seçin.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+          SizedBox(
+            height: (_localMenus.length * 52.0).clamp(52, 180),
+            child: ReorderableListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              buildDefaultDragHandles: false,
+              itemCount: _localMenus.length,
+              onReorder: _busy ? (_, __) {} : _onReorderMenu,
+              itemBuilder: (ctx, i) {
+                final m = _localMenus[i];
+                final selected = m.id == _selectedMenuId;
+                return Material(
+                  key: ValueKey(m.id),
+                  color: selected
+                      ? Theme.of(context).colorScheme.primaryContainer
+                      : null,
+                  child: ListTile(
+                    dense: true,
+                    leading: ReorderableDragStartListener(
+                      index: i,
+                      child: const Icon(Icons.drag_handle),
+                    ),
+                    title: Text(m.active ? m.name : '${m.name} (pasif)'),
+                    subtitle: Text('${m.products.length} ürün'),
+                    selected: selected,
+                    onTap: _busy
                         ? null
-                        : () => _openProductDialog(
-                            menuId: menu.id,
-                            allMenus: tree.menus,
-                          ),
-                    icon: const Icon(Icons.add),
-                    label: const Text('Ürün ekle'),
+                        : () => setState(() => _selectedMenuId = m.id),
                   ),
-                ),
+                );
+              },
+            ),
+          ),
+        ],
+        if (menu != null && !menu.active)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Text(
+              'Bu menü pasif — misafir ve garson menüsünde görünmez.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.error,
               ),
-          ],
-        );
-      },
+            ),
+          ),
+        if (menu != null && menu.products.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Text(
+              'Ürünler — sürükleyerek sıralayın',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ),
+        Expanded(
+          child: menu == null
+              ? Center(
+                  child: FilledButton.icon(
+                    onPressed: _busy ? null : () => _openMenuDialog(),
+                    icon: const Icon(Icons.restaurant_menu),
+                    label: const Text('İlk menüyü oluştur'),
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _refresh,
+                  child: menu.products.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: const [
+                            SizedBox(height: 48),
+                            Center(child: Text('Bu menüde ürün yok')),
+                          ],
+                        )
+                      : ReorderableListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          buildDefaultDragHandles: false,
+                          itemCount: menu.products.length,
+                          onReorder: _busy ? (_, __) {} : _onReorderProduct,
+                          itemBuilder: (ctx, i) {
+                            final p = menu.products[i];
+                            return Card(
+                              key: ValueKey(p.id),
+                              margin: const EdgeInsets.only(bottom: 8),
+                              child: ListTile(
+                                leading: ReorderableDragStartListener(
+                                  index: i,
+                                  child: const Icon(Icons.drag_handle),
+                                ),
+                                title: Text(p.name),
+                                subtitle: Text(
+                                  '${p.price.toStringAsFixed(2)} ₺'
+                                  '${p.description != null && p.description!.isNotEmpty ? ' · ${p.description}' : ''}',
+                                ),
+                                isThreeLine: p.description != null &&
+                                    p.description!.length > 40,
+                                trailing: PopupMenuButton<String>(
+                                  onSelected: (action) {
+                                    switch (action) {
+                                      case 'edit':
+                                        _openProductDialog(
+                                          menuId: menu.id,
+                                          existing: p,
+                                          allMenus: allMenus,
+                                        );
+                                      case 'options':
+                                        _openProductOptions(p.id);
+                                      case 'delete':
+                                        _deleteProduct(p);
+                                    }
+                                  },
+                                  itemBuilder: (_) => const [
+                                    PopupMenuItem(
+                                      value: 'edit',
+                                      child: Text('Düzenle'),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'options',
+                                      child: Text('Seçenekler'),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'delete',
+                                      child: Text('Sil'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+        ),
+        if (menu != null)
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: FilledButton.icon(
+                onPressed: _busy
+                    ? null
+                    : () => _openProductDialog(
+                        menuId: menu.id,
+                        allMenus: allMenus,
+                      ),
+                icon: const Icon(Icons.add),
+                label: const Text('Ürün ekle'),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

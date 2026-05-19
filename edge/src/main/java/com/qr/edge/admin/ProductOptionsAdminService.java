@@ -4,8 +4,11 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -28,6 +31,7 @@ import com.qr.edge.admin.api.AdminMenuProductsResponse.AdminProductDto;
 import com.qr.edge.admin.api.AdminProductOptionGroupsResponse;
 import com.qr.edge.admin.api.AdminProductOptionGroupsResponse.AdminOptionGroupDto;
 import com.qr.edge.admin.api.AdminProductOptionGroupsResponse.AdminOptionItemDto;
+import com.qr.edge.admin.api.ReorderIdsRequest;
 import com.qr.edge.admin.api.UpsertOptionGroupRequest;
 import com.qr.edge.admin.api.UpsertProductOptionRequest;
 
@@ -64,9 +68,9 @@ public class ProductOptionsAdminService {
 	public AdminMenuProductsResponse listMenuProducts(UUID restaurantId) {
 		requireRestaurant(restaurantId);
 		List<AdminMenuDto> menus = new ArrayList<>();
-		for (Menu menu : menuRepository.findByRestaurantIdAndIsDeletedFalseOrderByNameAsc(restaurantId)) {
+		for (Menu menu : menuRepository.findByRestaurantIdAndIsDeletedFalseOrderBySortIndexAscNameAsc(restaurantId)) {
 			List<AdminProductDto> products = new ArrayList<>();
-			for (Product p : productRepository.findByMenuIdAndIsDeletedFalseOrderByNameAsc(menu.getId())) {
+			for (Product p : productRepository.findByMenuIdAndIsDeletedFalseOrderBySortIndexAscNameAsc(menu.getId())) {
 				int groupCount = productOptionGroupRepository
 						.findByProductIdAndIsDeletedFalseOrderBySortIndexAsc(p.getId())
 						.size();
@@ -192,6 +196,50 @@ public class ProductOptionsAdminService {
 		productOptionRepository.save(opt);
 	}
 
+	@Transactional
+	public void reorderOptionGroups(UUID restaurantId, UUID productId, ReorderIdsRequest request) {
+		requireProductInRestaurant(restaurantId, productId);
+		applySortOrder(
+				productOptionGroupRepository
+						.findByProductIdAndIsDeletedFalseOrderBySortIndexAsc(productId)
+						.stream()
+						.map(ProductOptionGroup::getId)
+						.toList(),
+				request.orderedIds(),
+				(index, id) -> {
+					ProductOptionGroup group = requireGroupInRestaurant(restaurantId, id);
+					if (!group.getProductId().equals(productId)) {
+						throw new ResponseStatusException(
+								HttpStatus.BAD_REQUEST,
+								"Option group does not belong to product");
+					}
+					group.setSortIndex(index);
+					group.setUpdatedAt(LocalDateTime.now(clock));
+					productOptionGroupRepository.save(group);
+				});
+	}
+
+	@Transactional
+	public void reorderOptions(UUID restaurantId, UUID groupId, ReorderIdsRequest request) {
+		requireGroupInRestaurant(restaurantId, groupId);
+		applySortOrder(
+				productOptionRepository.findByOptionGroupIdAndIsDeletedFalseOrderBySortIndexAsc(groupId).stream()
+						.map(ProductOption::getId)
+						.toList(),
+				request.orderedIds(),
+				(index, id) -> {
+					ProductOption opt = requireOptionInRestaurant(restaurantId, id);
+					if (!opt.getOptionGroupId().equals(groupId)) {
+						throw new ResponseStatusException(
+								HttpStatus.BAD_REQUEST,
+								"Option does not belong to group");
+					}
+					opt.setSortIndex(index);
+					opt.setUpdatedAt(LocalDateTime.now(clock));
+					productOptionRepository.save(opt);
+				});
+	}
+
 	private AdminOptionGroupDto toGroupDto(ProductOptionGroup group) {
 		List<AdminOptionItemDto> options = new ArrayList<>();
 		for (ProductOption o : productOptionRepository
@@ -222,6 +270,22 @@ public class ProductOptionsAdminService {
 			return requested;
 		}
 		return productOptionRepository.findByOptionGroupIdAndIsDeletedFalseOrderBySortIndexAsc(groupId).size();
+	}
+
+	private static void applySortOrder(
+			List<UUID> existingIds,
+			List<UUID> orderedIds,
+			BiConsumer<Integer, UUID> apply) {
+		if (orderedIds.size() != existingIds.size()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "orderedIds must include all items");
+		}
+		Set<UUID> existing = new HashSet<>(existingIds);
+		if (!existing.equals(new HashSet<>(orderedIds))) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "orderedIds mismatch");
+		}
+		for (int i = 0; i < orderedIds.size(); i++) {
+			apply.accept(i, orderedIds.get(i));
+		}
 	}
 
 	private OptionSelectionType parseSelectionType(String raw) {

@@ -116,6 +116,68 @@ class WaiterPushConnection {
   }
 }
 
+bool _httpOk(int statusCode) => statusCode >= 200 && statusCode < 300;
+
+String _transferErrorMessage(int statusCode, String body) {
+  final lower = body.toLowerCase();
+  if (statusCode == 400 && lower.contains('no open orders')) {
+    return 'Bu masada devredilecek açık adisyon yok.';
+  }
+  if (statusCode == 400 && lower.contains('must differ')) {
+    return 'Kaynak ve hedef masa aynı olamaz.';
+  }
+  if (body.trim().isEmpty) {
+    return 'Masa devri başarısız ($statusCode).';
+  }
+  return 'Masa devri başarısız ($statusCode): $body';
+}
+
+Future<TransferTableOrdersResult> transferTableOrders({
+  required String edgeBaseUrl,
+  required String? accessToken,
+  required String sourceTableId,
+  required String targetTableId,
+}) async {
+  final uri = Uri.parse('${_root(edgeBaseUrl)}/api/v1/waiter/tables/transfer-orders');
+  final body = jsonEncode({
+    'sourceTableId': sourceTableId,
+    'targetTableId': targetTableId,
+  });
+  final res = await http.post(uri, headers: _authHeaders(accessToken), body: body);
+  if (!_httpOk(res.statusCode)) {
+    throw Exception(_transferErrorMessage(res.statusCode, res.body));
+  }
+  if (res.body.trim().isEmpty) {
+    return TransferTableOrdersResult(
+      sourceTableLabel: '',
+      targetTableLabel: '',
+      transferredCount: 0,
+    );
+  }
+  final map = jsonDecode(res.body) as Map<String, dynamic>;
+  final rawIds = map['transferredOrderIds'] as List<dynamic>? ?? [];
+  return TransferTableOrdersResult(
+    sourceTableLabel: map['sourceTableLabel'] as String? ?? '',
+    targetTableLabel: map['targetTableLabel'] as String? ?? '',
+    transferredCount: (map['transferredCount'] as num?)?.toInt() ?? rawIds.length,
+  );
+}
+
+Future<void> markWaiterLineDelivered({
+  required String edgeBaseUrl,
+  required String? accessToken,
+  required String orderId,
+  required String lineId,
+}) async {
+  final uri = Uri.parse(
+    '${_root(edgeBaseUrl)}/api/v1/waiter/orders/$orderId/lines/$lineId/delivered',
+  );
+  final res = await http.post(uri, headers: _authHeaders(accessToken));
+  if (!_httpOk(res.statusCode)) {
+    throw Exception('Servis çıkışı kaydedilemedi (${res.statusCode}): ${res.body}');
+  }
+}
+
 Future<WaiterPlaceOrderResult> placeWaiterOrder({
   required String edgeBaseUrl,
   required String? accessToken,
@@ -269,6 +331,18 @@ class WaiterReadyLineDto {
       kitchenLineStatus: j['kitchenLineStatus'] as String? ?? 'READY',
     );
   }
+}
+
+class TransferTableOrdersResult {
+  TransferTableOrdersResult({
+    required this.sourceTableLabel,
+    required this.targetTableLabel,
+    required this.transferredCount,
+  });
+
+  final String sourceTableLabel;
+  final String targetTableLabel;
+  final int transferredCount;
 }
 
 class WaiterPlaceOrderResult {

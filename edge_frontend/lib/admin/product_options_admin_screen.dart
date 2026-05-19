@@ -31,6 +31,7 @@ class _ProductOptionsAdminScreenState extends State<ProductOptionsAdminScreen> {
   bool _loadingGroups = false;
   String? _groupsError;
   AdminProductOptionGroupsPayload? _groups;
+  List<AdminOptionGroupDto> _localGroups = [];
 
   @override
   void initState() {
@@ -91,6 +92,8 @@ class _ProductOptionsAdminScreenState extends State<ProductOptionsAdminScreen> {
       if (!mounted) return;
       setState(() {
         _groups = payload;
+        _localGroups = List<AdminOptionGroupDto>.from(payload.groups)
+          ..sort((a, b) => a.sortIndex.compareTo(b.sortIndex));
         _loadingGroups = false;
       });
     } catch (e) {
@@ -106,8 +109,63 @@ class _ProductOptionsAdminScreenState extends State<ProductOptionsAdminScreen> {
     setState(() {
       _selectedProductId = productId;
       _groups = null;
+      _localGroups = [];
     });
     if (productId != null) {
+      await _loadGroups();
+    }
+  }
+
+  Future<void> _persistGroupOrder() async {
+    final pid = _selectedProductId;
+    if (pid == null || _localGroups.length < 2) return;
+    try {
+      await reorderOptionGroups(
+        edgeBaseUrl: widget.edgeBaseUrl,
+        accessToken: widget.authToken,
+        restaurantId: widget.restaurantId,
+        productId: pid,
+        orderedIds: _localGroups.map((g) => g.id).toList(),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      await _loadGroups();
+    }
+  }
+
+  Future<void> _onReorderGroup(int oldIndex, int newIndex) async {
+    if (newIndex > oldIndex) newIndex -= 1;
+    setState(() {
+      final item = _localGroups.removeAt(oldIndex);
+      _localGroups.insert(newIndex, item);
+    });
+    await _persistGroupOrder();
+  }
+
+  Future<void> _onReorderOption(String groupId, int oldIndex, int newIndex) async {
+    if (newIndex > oldIndex) newIndex -= 1;
+    final gi = _localGroups.indexWhere((g) => g.id == groupId);
+    if (gi < 0) return;
+    final group = _localGroups[gi];
+    if (group.options.length < 2) return;
+    final options = List<AdminOptionItemDto>.from(group.options);
+    final item = options.removeAt(oldIndex);
+    options.insert(newIndex, item);
+    setState(() {
+      _localGroups[gi] = group.copyWith(options: options);
+    });
+    try {
+      await reorderOptions(
+        edgeBaseUrl: widget.edgeBaseUrl,
+        accessToken: widget.authToken,
+        restaurantId: widget.restaurantId,
+        groupId: groupId,
+        orderedIds: options.map((o) => o.id).toList(),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
       await _loadGroups();
     }
   }
@@ -359,7 +417,7 @@ class _ProductOptionsAdminScreenState extends State<ProductOptionsAdminScreen> {
                 if (_groups != null) ...[
                   const SizedBox(height: 8),
                   Text(
-                    '${_groups!.productName} — ${_groups!.groups.length} seçenek grubu',
+                    '${_groups!.productName} — ${_localGroups.length} seçenek grubu',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
@@ -397,8 +455,7 @@ class _ProductOptionsAdminScreenState extends State<ProductOptionsAdminScreen> {
         ),
       );
     }
-    final groups = _groups?.groups ?? [];
-    if (groups.isEmpty) {
+    if (_localGroups.isEmpty) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(24),
@@ -412,18 +469,25 @@ class _ProductOptionsAdminScreenState extends State<ProductOptionsAdminScreen> {
 
     return RefreshIndicator(
       onRefresh: _loadGroups,
-      child: ListView.builder(
+      child: ReorderableListView.builder(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 80),
-        itemCount: groups.length,
+        buildDefaultDragHandles: false,
+        itemCount: _localGroups.length,
+        onReorder: _onReorderGroup,
         itemBuilder: (context, i) {
-          final g = groups[i];
+          final g = _localGroups[i];
           final typeLabel = g.selectionType == 'MULTI' ? 'Çoklu' : 'Tek seçim';
           return Card(
+            key: ValueKey(g.id),
             margin: const EdgeInsets.only(bottom: 10),
             child: ExpansionTile(
               initiallyExpanded: true,
+              leading: ReorderableDragStartListener(
+                index: i,
+                child: const Icon(Icons.drag_handle),
+              ),
               title: Text(g.name),
-              subtitle: Text('$typeLabel · sıra ${g.sortIndex}'),
+              subtitle: Text('$typeLabel · ${g.options.length} seçenek'),
               trailing: PopupMenuButton<String>(
                 onSelected: (v) async {
                   if (v == 'edit') {
@@ -461,46 +525,68 @@ class _ProductOptionsAdminScreenState extends State<ProductOptionsAdminScreen> {
                     child: Text('Henüz seçenek yok.'),
                   )
                 else
-                  for (final o in g.options)
-                    ListTile(
-                      dense: true,
-                      title: Text(o.label),
-                      subtitle: Text(
-                        o.priceAdjustment == 0
-                            ? 'Fiyat farkı yok'
-                            : '+${o.priceAdjustment.toStringAsFixed(2)} ₺',
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.edit_outlined, size: 20),
-                            onPressed: () => _showOptionDialog(groupId: g.id, existing: o),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline, size: 20),
-                            onPressed: () async {
-                              if (!await _confirmDelete('“${o.label}”')) return;
-                              try {
-                                await deleteProductOption(
-                                  edgeBaseUrl: widget.edgeBaseUrl,
-                                  accessToken: widget.authToken,
-                                  restaurantId: widget.restaurantId,
-                                  optionId: o.id,
-                                );
-                                await _loadGroups();
-                              } catch (e) {
-                                if (mounted) {
-                                  ScaffoldMessenger.of(
-                                    context,
-                                  ).showSnackBar(SnackBar(content: Text('$e')));
-                                }
-                              }
-                            },
-                          ),
-                        ],
-                      ),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8, right: 8, bottom: 8),
+                    child: Text(
+                      'Seçenekleri sürükleyerek sıralayın',
+                      style: Theme.of(context).textTheme.labelSmall,
                     ),
+                  ),
+                if (g.options.isNotEmpty)
+                  ReorderableListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    buildDefaultDragHandles: false,
+                    itemCount: g.options.length,
+                    onReorder: (old, nw) => _onReorderOption(g.id, old, nw),
+                    itemBuilder: (ctx, oi) {
+                      final o = g.options[oi];
+                      return ListTile(
+                        key: ValueKey(o.id),
+                        dense: true,
+                        leading: ReorderableDragStartListener(
+                          index: oi,
+                          child: const Icon(Icons.drag_handle, size: 20),
+                        ),
+                        title: Text(o.label),
+                        subtitle: Text(
+                          o.priceAdjustment == 0
+                              ? 'Fiyat farkı yok'
+                              : '+${o.priceAdjustment.toStringAsFixed(2)} ₺',
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined, size: 20),
+                              onPressed: () => _showOptionDialog(groupId: g.id, existing: o),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, size: 20),
+                              onPressed: () async {
+                                if (!await _confirmDelete('“${o.label}”')) return;
+                                try {
+                                  await deleteProductOption(
+                                    edgeBaseUrl: widget.edgeBaseUrl,
+                                    accessToken: widget.authToken,
+                                    restaurantId: widget.restaurantId,
+                                    optionId: o.id,
+                                  );
+                                  await _loadGroups();
+                                } catch (e) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(
+                                      context,
+                                    ).showSnackBar(SnackBar(content: Text('$e')));
+                                  }
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
               ],
             ),
           );

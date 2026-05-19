@@ -12,5 +12,5 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
 	List<Product> findByUpdatedAtAfter(LocalDateTime watermark);
 
-	List<Product> findByMenuIdAndIsDeletedFalseOrderByNameAsc(UUID menuId);
+	List<Product> findByMenuIdAndIsDeletedFalseOrderBySortIndexAscNameAsc(UUID menuId);
 }

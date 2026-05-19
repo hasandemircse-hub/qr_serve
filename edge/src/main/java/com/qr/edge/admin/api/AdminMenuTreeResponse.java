@@ -11,6 +11,7 @@ public record AdminMenuTreeResponse(List<AdminMenuDetailDto> menus) {
 			String name,
 			String description,
 			boolean active,
+			int sortIndex,
 			List<AdminProductDetailDto> products) {
 	}
 
@@ -20,6 +21,7 @@ public record AdminMenuTreeResponse(List<AdminMenuDetailDto> menus) {
 			String description,
 			BigDecimal price,
 			String sku,
-			BigDecimal taxRate) {
+			BigDecimal taxRate,
+			int sortIndex) {
 	}
 }

@@ -134,9 +134,9 @@ public class CloudSyncService {
 		for (User u : userRepository.findByRestaurantId(restaurantId)) {
 			items.add(env(SyncEntityType.USER, u));
 		}
-		for (Menu m : menuRepository.findByRestaurantIdAndIsDeletedFalseOrderByNameAsc(restaurantId)) {
+		for (Menu m : menuRepository.findByRestaurantIdAndIsDeletedFalseOrderBySortIndexAscNameAsc(restaurantId)) {
 			items.add(env(SyncEntityType.MENU, m));
-			for (Product p : productRepository.findByMenuIdAndIsDeletedFalseOrderByNameAsc(m.getId())) {
+			for (Product p : productRepository.findByMenuIdAndIsDeletedFalseOrderBySortIndexAscNameAsc(m.getId())) {
 				items.add(env(SyncEntityType.PRODUCT, p));
 				for (ProductOptionGroup g : productOptionGroupRepository.findByProductIdAndIsDeletedFalseOrderBySortIndexAsc(
 						p.getId())) {

@@ -31,6 +31,9 @@ public class Menu extends BaseEntity {
 	@Column(nullable = false)
 	private Boolean active = true;
 
+	@Column(name = "sort_index", nullable = false)
+	private Integer sortIndex = 0;
+
 	public UUID getRestaurantId() {
 		return restaurantId;
 	}
@@ -66,5 +69,13 @@ public class Menu extends BaseEntity {
 
 	public void setActive(Boolean active) {
 		this.active = active;
+	}
+
+	public Integer getSortIndex() {
+		return sortIndex;
+	}
+
+	public void setSortIndex(Integer sortIndex) {
+		this.sortIndex = sortIndex;
 	}
 }

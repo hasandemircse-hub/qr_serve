@@ -126,11 +126,23 @@ class _WaiterLandingState extends State<WaiterLanding> {
     }
   }
 
-  void _dismissReadyLine(String lineId) {
-    setState(() {
-      _dismissedLineIds.add(lineId);
-      _readyLines.removeWhere((l) => l.lineId == lineId);
-    });
+  Future<void> _dismissReadyLine(WaiterReadyLineDto line) async {
+    try {
+      await markWaiterLineDelivered(
+        edgeBaseUrl: widget.edgeBaseUrl,
+        accessToken: widget.auth.accessToken,
+        orderId: line.orderId,
+        lineId: line.lineId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _dismissedLineIds.add(line.lineId);
+        _readyLines.removeWhere((l) => l.lineId == line.lineId);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      _toast(context, '$e');
+    }
   }
 
   void _showReadySheet() {
@@ -168,10 +180,9 @@ class _WaiterLandingState extends State<WaiterLanding> {
                         trailing: IconButton(
                           icon: const Icon(Icons.done_all),
                           tooltip: 'Teslim alındı',
-                          onPressed: () {
-                            _dismissReadyLine(l.lineId);
-                            Navigator.pop(ctx);
-                            setState(() {});
+                          onPressed: () async {
+                            await _dismissReadyLine(l);
+                            if (ctx.mounted) Navigator.pop(ctx);
                           },
                         ),
                       ),
@@ -364,6 +375,7 @@ class _WaiterLandingState extends State<WaiterLanding> {
                       _TableCardFromDto(
                         table: t,
                         onTap: () => _openOrderFlow(context, t),
+                        onTransfer: () => _transferTableOrders(context, t),
                       ),
                   ],
                 );
@@ -396,6 +408,90 @@ class _WaiterLandingState extends State<WaiterLanding> {
         ),
       ),
     );
+  }
+
+  Future<void> _transferTableOrders(BuildContext context, WaiterTableDto source) async {
+    final tables = _tables;
+    if (tables == null || tables.isEmpty) {
+      _toast(context, 'Masa listesi yüklenemedi.');
+      return;
+    }
+    final targets = tables.where((t) => t.id != source.id).toList();
+    if (targets.isEmpty) {
+      _toast(context, 'Devredilecek başka masa yok.');
+      return;
+    }
+    final picked = await showDialog<WaiterTableDto>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text('Masa ${source.label} → hedef masa'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: targets.length,
+              itemBuilder: (_, i) {
+                final t = targets[i];
+                final zone = (t.zone ?? '').trim();
+                return ListTile(
+                  title: Text(t.label),
+                  subtitle: zone.isEmpty ? null : Text(zone),
+                  onTap: () => Navigator.of(ctx).pop(t),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('İptal'),
+            ),
+          ],
+        );
+      },
+    );
+    if (picked == null || !context.mounted) return;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Masayı devret'),
+        content: Text(
+          'Masa ${source.label} üzerindeki tüm açık adisyonlar '
+          'Masa ${picked.label} masasına taşınacak. Onaylıyor musunuz?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('İptal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Devret'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+
+    try {
+      final res = await transferTableOrders(
+        edgeBaseUrl: widget.edgeBaseUrl,
+        accessToken: widget.auth.accessToken,
+        sourceTableId: source.id,
+        targetTableId: picked.id,
+      );
+      if (!context.mounted) return;
+      _toast(
+        context,
+        '${res.sourceTableLabel} → ${res.targetTableLabel}: '
+        '${res.transferredCount} adisyon devredildi.',
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      _toast(context, '$e');
+    }
   }
 
   Future<void> _openOrderFlow(BuildContext context, WaiterTableDto table) async {
@@ -441,7 +537,7 @@ class _ReadyLinesPanel extends StatelessWidget {
   final List<WaiterReadyLineDto> lines;
   final Set<String> dismissed;
   final VoidCallback onRefresh;
-  final void Function(String lineId) onDismiss;
+  final Future<void> Function(WaiterReadyLineDto line) onDismiss;
 
   @override
   Widget build(BuildContext context) {
@@ -497,8 +593,8 @@ class _ReadyLinesPanel extends StatelessWidget {
                   subtitle: Text('× ${l.quantity}  ·  ${l.orderNumber}'),
                   trailing: IconButton(
                     icon: const Icon(Icons.done_all, size: 20),
-                    tooltip: 'Teslim alındı',
-                    onPressed: () => onDismiss(l.lineId),
+                    tooltip: 'Servis edildi',
+                    onPressed: () => onDismiss(l),
                   ),
                 ),
             if (visible.length > 5)
@@ -800,10 +896,12 @@ class _TableCardFromDto extends StatelessWidget {
   const _TableCardFromDto({
     required this.table,
     required this.onTap,
+    required this.onTransfer,
   });
 
   final WaiterTableDto table;
   final VoidCallback onTap;
+  final VoidCallback onTransfer;
 
   @override
   Widget build(BuildContext context) {
@@ -833,7 +931,21 @@ class _TableCardFromDto extends StatelessWidget {
                           ),
                     ),
                   ),
-                  Icon(Icons.event_seat_outlined, size: 22, color: scheme.primary),
+                  PopupMenuButton<String>(
+                    icon: Icon(Icons.more_vert, color: scheme.onSurfaceVariant),
+                    padding: EdgeInsets.zero,
+                    onSelected: (v) {
+                      if (v == 'transfer') {
+                        onTransfer();
+                      }
+                    },
+                    itemBuilder: (ctx) => const [
+                      PopupMenuItem(
+                        value: 'transfer',
+                        child: Text('Masayı devret'),
+                      ),
+                    ],
+                  ),
                 ],
               ),
               const Spacer(),

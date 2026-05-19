@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.qr.edge.admin.api.AdminMenuTreeResponse;
 import com.qr.edge.admin.api.AdminMenuTreeResponse.AdminMenuDetailDto;
 import com.qr.edge.admin.api.AdminMenuTreeResponse.AdminProductDetailDto;
+import com.qr.edge.admin.api.ReorderIdsRequest;
 import com.qr.edge.admin.api.UpsertMenuRequest;
 import com.qr.edge.admin.api.UpsertProductRequest;
 
@@ -36,6 +37,25 @@ public class MenuAdminController {
 	@PreAuthorize("@edgeAuth.isRestaurantAdmin(authentication, #restaurantId)")
 	public AdminMenuTreeResponse menuTree(@PathVariable UUID restaurantId) {
 		return menuAdminService.listTree(restaurantId);
+	}
+
+	@PutMapping("/menus/reorder")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	@PreAuthorize("@edgeAuth.isRestaurantAdmin(authentication, #restaurantId)")
+	public void reorderMenus(
+			@PathVariable UUID restaurantId,
+			@Valid @RequestBody ReorderIdsRequest body) {
+		menuAdminService.reorderMenus(restaurantId, body);
+	}
+
+	@PutMapping("/menus/{menuId}/products/reorder")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	@PreAuthorize("@edgeAuth.isRestaurantAdmin(authentication, #restaurantId)")
+	public void reorderProducts(
+			@PathVariable UUID restaurantId,
+			@PathVariable UUID menuId,
+			@Valid @RequestBody ReorderIdsRequest body) {
+		menuAdminService.reorderProducts(restaurantId, menuId, body);
 	}
 
 	@PostMapping("/menus")

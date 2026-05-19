@@ -38,6 +38,9 @@ public class Product extends BaseEntity {
 	@Column(name = "tax_rate", precision = 5, scale = 4)
 	private BigDecimal taxRate;
 
+	@Column(name = "sort_index", nullable = false)
+	private Integer sortIndex = 0;
+
 	public UUID getMenuId() {
 		return menuId;
 	}
@@ -89,5 +92,13 @@ public class Product extends BaseEntity {
 
 	public void setTaxRate(BigDecimal taxRate) {
 		this.taxRate = taxRate;
+	}
+
+	public Integer getSortIndex() {
+		return sortIndex;
+	}
+
+	public void setSortIndex(Integer sortIndex) {
+		this.sortIndex = sortIndex;
 	}
 }

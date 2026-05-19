@@ -179,6 +179,43 @@ Future<AdminProductDetailDto> updateProduct({
   );
 }
 
+Future<void> reorderMenus({
+  required String edgeBaseUrl,
+  required String? accessToken,
+  required String restaurantId,
+  required List<String> orderedIds,
+}) async {
+  final uri = Uri.parse(_restaurantPath(edgeBaseUrl, restaurantId, '/menus/reorder'));
+  final res = await http.put(
+    uri,
+    headers: _headers(accessToken, jsonBody: true),
+    body: jsonEncode({'orderedIds': orderedIds}),
+  );
+  if (res.statusCode != 204) {
+    throw Exception('Menü sırası kaydedilemedi (${res.statusCode}): ${res.body}');
+  }
+}
+
+Future<void> reorderProducts({
+  required String edgeBaseUrl,
+  required String? accessToken,
+  required String restaurantId,
+  required String menuId,
+  required List<String> orderedIds,
+}) async {
+  final uri = Uri.parse(
+    _restaurantPath(edgeBaseUrl, restaurantId, '/menus/$menuId/products/reorder'),
+  );
+  final res = await http.put(
+    uri,
+    headers: _headers(accessToken, jsonBody: true),
+    body: jsonEncode({'orderedIds': orderedIds}),
+  );
+  if (res.statusCode != 204) {
+    throw Exception('Ürün sırası kaydedilemedi (${res.statusCode}): ${res.body}');
+  }
+}
+
 Future<void> deleteProduct({
   required String edgeBaseUrl,
   required String? accessToken,
@@ -215,6 +252,7 @@ class AdminMenuDetailDto {
     required this.name,
     this.description,
     required this.active,
+    required this.sortIndex,
     required this.products,
   });
 
@@ -222,18 +260,33 @@ class AdminMenuDetailDto {
   final String name;
   final String? description;
   final bool active;
+  final int sortIndex;
   final List<AdminProductDetailDto> products;
+
+  AdminMenuDetailDto copyWith({List<AdminProductDetailDto>? products}) {
+    return AdminMenuDetailDto(
+      id: id,
+      name: name,
+      description: description,
+      active: active,
+      sortIndex: sortIndex,
+      products: products ?? this.products,
+    );
+  }
 
   factory AdminMenuDetailDto.fromJson(Map<String, dynamic> j) {
     final raw = j['products'] as List<dynamic>? ?? [];
+    final products = raw
+        .map((e) => AdminProductDetailDto.fromJson(e as Map<String, dynamic>))
+        .toList()
+      ..sort((a, b) => a.sortIndex.compareTo(b.sortIndex));
     return AdminMenuDetailDto(
       id: j['id'] as String,
       name: j['name'] as String,
       description: j['description'] as String?,
       active: j['active'] as bool? ?? true,
-      products: raw
-          .map((e) => AdminProductDetailDto.fromJson(e as Map<String, dynamic>))
-          .toList(),
+      sortIndex: (j['sortIndex'] as num?)?.toInt() ?? 0,
+      products: products,
     );
   }
 }
@@ -246,6 +299,7 @@ class AdminProductDetailDto {
     required this.price,
     this.sku,
     this.taxRate,
+    required this.sortIndex,
   });
 
   final String id;
@@ -254,6 +308,7 @@ class AdminProductDetailDto {
   final double price;
   final String? sku;
   final double? taxRate;
+  final int sortIndex;
 
   factory AdminProductDetailDto.fromJson(Map<String, dynamic> j) {
     return AdminProductDetailDto(
@@ -263,6 +318,7 @@ class AdminProductDetailDto {
       price: (j['price'] as num).toDouble(),
       sku: j['sku'] as String?,
       taxRate: j['taxRate'] == null ? null : (j['taxRate'] as num).toDouble(),
+      sortIndex: (j['sortIndex'] as num?)?.toInt() ?? 0,
     );
   }
 }

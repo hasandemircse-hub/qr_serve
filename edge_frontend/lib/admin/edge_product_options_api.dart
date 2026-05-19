@@ -150,6 +150,46 @@ Future<void> updateProductOption({
   }
 }
 
+Future<void> reorderOptionGroups({
+  required String edgeBaseUrl,
+  required String? accessToken,
+  required String restaurantId,
+  required String productId,
+  required List<String> orderedIds,
+}) async {
+  final uri = Uri.parse(
+    _restaurantPath(edgeBaseUrl, restaurantId, '/products/$productId/option-groups/reorder'),
+  );
+  final res = await http.put(
+    uri,
+    headers: _headers(accessToken),
+    body: jsonEncode({'orderedIds': orderedIds}),
+  );
+  if (res.statusCode != 204) {
+    throw Exception('Grup sırası kaydedilemedi (${res.statusCode}): ${res.body}');
+  }
+}
+
+Future<void> reorderOptions({
+  required String edgeBaseUrl,
+  required String? accessToken,
+  required String restaurantId,
+  required String groupId,
+  required List<String> orderedIds,
+}) async {
+  final uri = Uri.parse(
+    _restaurantPath(edgeBaseUrl, restaurantId, '/option-groups/$groupId/options/reorder'),
+  );
+  final res = await http.put(
+    uri,
+    headers: _headers(accessToken),
+    body: jsonEncode({'orderedIds': orderedIds}),
+  );
+  if (res.statusCode != 204) {
+    throw Exception('Seçenek sırası kaydedilemedi (${res.statusCode}): ${res.body}');
+  }
+}
+
 Future<void> deleteProductOption({
   required String edgeBaseUrl,
   required String? accessToken,
@@ -262,14 +302,28 @@ class AdminOptionGroupDto {
   final int sortIndex;
   final List<AdminOptionItemDto> options;
 
+  AdminOptionGroupDto copyWith({List<AdminOptionItemDto>? options}) {
+    return AdminOptionGroupDto(
+      id: id,
+      name: name,
+      selectionType: selectionType,
+      sortIndex: sortIndex,
+      options: options ?? this.options,
+    );
+  }
+
   factory AdminOptionGroupDto.fromJson(Map<String, dynamic> j) {
     final raw = j['options'] as List<dynamic>? ?? [];
+    final options = raw
+        .map((e) => AdminOptionItemDto.fromJson(e as Map<String, dynamic>))
+        .toList()
+      ..sort((a, b) => a.sortIndex.compareTo(b.sortIndex));
     return AdminOptionGroupDto(
       id: j['id'] as String,
       name: j['name'] as String? ?? '',
       selectionType: j['selectionType'] as String? ?? 'SINGLE',
       sortIndex: (j['sortIndex'] as num?)?.toInt() ?? 0,
-      options: raw.map((e) => AdminOptionItemDto.fromJson(e as Map<String, dynamic>)).toList(),
+      options: options,
     );
   }
 }
