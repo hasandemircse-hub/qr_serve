@@ -1,4 +1,7 @@
 /// Cloud API kökü. İsterseniz: `flutter run --dart-define=CLOUD_BASE_URL=https://cloud.example.com`
+///
+/// Üretimde Cloud Caddy aynı host'tan hem statik web'i hem API'yi servis ettiği için
+/// `--dart-define=CLOUD_BASE_URL=` (boş) verilebilir → istekler sayfa origin'ine gider.
 class AppConfig {
   AppConfig._();
 

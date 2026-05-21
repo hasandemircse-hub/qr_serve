@@ -1,0 +1,36 @@
+# QuickServe Cloud Caddy konfigürasyonu
+#
+# CLOUD_HOSTNAME = cloud.example.com (env'den gelir).
+# Caddy bir hostname üzerinde:
+#   - /api/*, /r/*  -> cloud Spring Boot konteyner
+#   - diğer her şey -> cloud_frontend (Flutter Web) statik
+#
+# Misafir QR akışı:
+#   QR -> https://CLOUD_HOSTNAME/r/<rid>/t/<tid>/<token>
+#   Spring redirect -> https://CLOUD_HOSTNAME/#/guest/qr?...
+# (Aynı origin: CORS sorun yok.)
+
+{$CLOUD_HOSTNAME} {
+	encode zstd gzip
+
+	# API + sync + misafir BFF
+	@api {
+		path /api/* /r/*
+	}
+	handle @api {
+		reverse_proxy cloud:8080
+	}
+
+	# cloud_frontend (Flutter Web)
+	handle {
+		root * /srv/cloud_frontend
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	}
+}

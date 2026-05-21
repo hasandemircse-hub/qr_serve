@@ -3,6 +3,7 @@ com/qr/common/persistence/entity/Payment.class
 com/qr/common/sync/LwwMerge.class
 com/qr/common/persistence/entity/RestaurantOrder.class
 com/qr/common/api/auth/LoginRequest.class
+com/qr/common/persistence/entity/TableClosureBalanceDisposition.class
 com/qr/common/persistence/entity/SyncMetadata.class
 com/qr/common/persistence/entity/KitchenLineStatus.class
 com/qr/common/persistence/entity/OrderStatus.class
@@ -31,6 +32,7 @@ com/qr/common/persistence/entity/TableLayoutShape.class
 com/qr/common/persistence/entity/ProductOption.class
 com/qr/common/billing/pos/PosOperationResult.class
 com/qr/common/billing/fiscal/InvoicingProvider.class
+com/qr/common/persistence/repository/TableClosureAuditLogRepository.class
 com/qr/common/sync/api/EdgeHelloRequest.class
 com/qr/common/persistence/repository/FiscalAuditLogRepository.class
 com/qr/common/billing/fiscal/FiscalSalesDocumentRequest.class
@@ -60,8 +62,11 @@ com/qr/common/config/JwtProperties.class
 com/qr/common/billing/fiscal/FiscalSalesDocumentRequest$FiscalLineSnapshot.class
 com/qr/common/persistence/repository/DiningTableRepository.class
 com/qr/common/persistence/entity/User.class
+com/qr/common/persistence/entity/TableClosureAuditLog.class
+com/qr/common/persistence/entity/TableClosureReasonCode.class
 com/qr/common/persistence/entity/FiscalAuditLog.class
 com/qr/common/billing/pos/PosTerminalGateway.class
 com/qr/common/persistence/entity/GuestServiceRequest.class
 com/qr/common/persistence/entity/Restaurant.class
 com/qr/common/persistence/entity/Product.class
+com/qr/common/persistence/entity/TableClosurePolicy.class

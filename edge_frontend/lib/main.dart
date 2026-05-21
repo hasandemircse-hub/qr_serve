@@ -29,12 +29,19 @@ class QuickServeEdgeApp extends StatefulWidget {
   static const demoRestaurantId = '11111111-1111-1111-1111-111111111111';
   static const demoProductId = '44444444-4444-4444-4444-444444444444';
 
-  /// Edge HTTP API tabanı (mobil/desktop). Web'de [resolveEdgeBaseUrl] ile
-  /// sayfa host'u (localhost / 127.0.0.1) hizalanır.
-  static const edgeBaseUrlConfigured = 'http://127.0.0.1:8081';
+  /// Edge HTTP API tabanı. Web build'de [resolveEdgeBaseUrl] ile sayfa host'una
+  /// hizalanır. Üretimde build sırasında: `--dart-define=EDGE_BASE_URL=` (boş)
+  /// veya `--dart-define=EDGE_BASE_URL=https://edge.example.com`.
+  static const edgeBaseUrlConfigured = String.fromEnvironment(
+    'EDGE_BASE_URL',
+    defaultValue: 'http://127.0.0.1:8081',
+  );
 
   /// Cloud misafir BFF (internet QR REST). WebSocket hâlâ Edge üzerinden.
-  static const cloudBaseUrlConfigured = 'http://127.0.0.1:8080';
+  static const cloudBaseUrlConfigured = String.fromEnvironment(
+    'CLOUD_BASE_URL',
+    defaultValue: 'http://127.0.0.1:8080',
+  );
 
   @override
   State<QuickServeEdgeApp> createState() => _QuickServeEdgeAppState();

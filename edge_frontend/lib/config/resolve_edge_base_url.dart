@@ -7,7 +7,19 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 String resolveEdgeBaseUrl(String configured) {
   if (!kIsWeb) return configured;
   final raw = configured.trim();
-  if (raw.isEmpty) return configured;
+  // Prod build: --dart-define=EDGE_BASE_URL= (boş) verilirse sayfa origin'ini kullan.
+  // Bu sayede Caddy aynı host'tan hem statik web'i hem API'yi servis edebilir.
+  if (raw.isEmpty) {
+    final base = Uri.base;
+    if (base.hasScheme && base.host.isNotEmpty) {
+      return Uri(
+        scheme: base.scheme,
+        host: base.host,
+        port: base.hasPort ? base.port : null,
+      ).toString();
+    }
+    return configured;
+  }
   final Uri configuredUri;
   try {
     configuredUri = Uri.parse(raw);

@@ -1,27 +1,75 @@
-# JWT: Cloud ile aynı QUICKSERVE_JWT_SECRET kullanın (istemci token doğrulaması).
-# Canlı edge: PostgreSQL + ortamdan edge/restoran kimliği ve cloud adresi.
-# Örnek:
-#   SPRING_DATASOURCE_URL=jdbc:postgresql://host:5432/quickserve_edge
-#   SPRING_DATASOURCE_USERNAME=...
-#   SPRING_DATASOURCE_PASSWORD=...
-#   QUICKSERVE_CLOUD_BASE_URL=https://cloud.ornek.com
-#   QUICKSERVE_EDGE_ID=<uuid>
-#   QUICKSERVE_RESTAURANT_ID=<uuid>
-quickserve:
-  jwt:
-    secret: ${QUICKSERVE_JWT_SECRET}
-    expiration-hours: 24
-  public-edge-url: ${QUICKSERVE_PUBLIC_EDGE_URL:http://127.0.0.1:8081}
-  cloud:
-    base-url: ${QUICKSERVE_CLOUD_BASE_URL}
-  edge-id: ${QUICKSERVE_EDGE_ID}
-  restaurant-id: ${QUICKSERVE_RESTAURANT_ID}
+# QuickServe Edge — prod profili
+# Tüm sırlar ve URL'ler ortam değişkeninden gelir.
+
+server:
+  port: 8081
+  forward-headers-strategy: native
+  tomcat:
+    max-http-form-post-size: 10MB
 
 spring:
+  application:
+    name: quickserve-edge
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
   flyway:
+    enabled: true
     locations: classpath:db/migration
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+quickserve:
+  mode: ${MODE:FULL_STACK}
+  jwt:
+    secret: ${QUICKSERVE_JWT_SECRET}
+    expiration-hours: ${QUICKSERVE_JWT_EXPIRATION_HOURS:24}
+  public-edge-url: ${QUICKSERVE_PUBLIC_EDGE_URL}
+  public-cloud-url: ${QUICKSERVE_PUBLIC_CLOUD_URL}
+  edge-id: ${QUICKSERVE_EDGE_ID}
+  restaurant-id: ${QUICKSERVE_RESTAURANT_ID}
+  guest-lab-enabled: ${QUICKSERVE_GUEST_LAB_ENABLED:false}
+  media:
+    product-images-dir: ${QUICKSERVE_MEDIA_PRODUCT_IMAGES_DIR:/app/data/product-images}
+    max-image-bytes: ${QUICKSERVE_MEDIA_MAX_IMAGE_BYTES:5242880}
+  cloud:
+    base-url: ${QUICKSERVE_CLOUD_BASE_URL}
+    mock: false
+  setup:
+    wizard-enabled: ${QUICKSERVE_SETUP_WIZARD_ENABLED:false}
+  edge:
+    sync:
+      enabled: ${QUICKSERVE_EDGE_SYNC_ENABLED:true}
+      scheduler-enabled: ${QUICKSERVE_EDGE_SYNC_SCHEDULER_ENABLED:true}
+      batch-size: ${QUICKSERVE_EDGE_SYNC_BATCH_SIZE:50}
+      poll-interval-ms: ${QUICKSERVE_EDGE_SYNC_POLL_INTERVAL_MS:5000}
+    discovery:
+      hello-interval-ms: ${QUICKSERVE_EDGE_DISCOVERY_HELLO_INTERVAL_MS:60000}
+      hello-on-startup: true
+  print:
+    enabled: ${QUICKSERVE_PRINT_ENABLED:true}
+    charset: UTF-8
+    default-network-port: 9100
+    slip-width-chars: 42
+    printers: []

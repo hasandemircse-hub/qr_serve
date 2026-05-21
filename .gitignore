@@ -1,0 +1,28 @@
+# --- Secrets / env ---
+.env
+.env.local
+*.env.local
+deploy/**/.env
+!deploy/**/.env.example
+
+# --- Build outputs ---
+target/
+build/
+*.jar
+*.class
+
+# --- IDE ---
+.idea/
+*.iml
+.vscode/*
+!.vscode/launch.json
+!.vscode/settings.json
+.DS_Store
+
+# --- Runtime data ---
+data/
+logs/
+*.log
+
+# --- OS ---
+Thumbs.db

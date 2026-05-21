@@ -1,0 +1,103 @@
+# QuickServe Edge — Restoran makinesi docker-compose
+# Çalıştırma:
+#   1. cp .env.example .env  (değerleri doldur)
+#   2. cloudflared tunnel create + credentials.json'u ./cloudflared/ içine koy
+#   3. ../scripts/build-edge-frontend.sh ile edge_frontend/build/web üretildiğine emin ol
+#   4. docker compose up -d --build
+#
+# Servisler:
+#   postgres    : Edge yerel verisi (offline-first)
+#   edge        : Spring Boot Edge API (8081)
+#   caddy       : LAN reverse proxy + edge_frontend statik
+#   cloudflared : Cloudflare Tunnel sidecar (misafir trafiği için)
+
+name: quickserve-edge
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-quickserve_edge}
+      POSTGRES_USER: ${POSTGRES_USER:-quickserve}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-quickserve}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  edge:
+    build:
+      context: ../..
+      dockerfile: deploy/edge/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-quickserve_edge}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-quickserve}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      QUICKSERVE_JWT_SECRET: ${QUICKSERVE_JWT_SECRET}
+      QUICKSERVE_EDGE_ID: ${QUICKSERVE_EDGE_ID}
+      QUICKSERVE_RESTAURANT_ID: ${QUICKSERVE_RESTAURANT_ID}
+      QUICKSERVE_PUBLIC_EDGE_URL: ${QUICKSERVE_PUBLIC_EDGE_URL}
+      QUICKSERVE_PUBLIC_CLOUD_URL: ${QUICKSERVE_PUBLIC_CLOUD_URL}
+      QUICKSERVE_CLOUD_BASE_URL: ${QUICKSERVE_CLOUD_BASE_URL}
+      QUICKSERVE_GUEST_LAB_ENABLED: ${QUICKSERVE_GUEST_LAB_ENABLED:-false}
+      QUICKSERVE_MEDIA_PRODUCT_IMAGES_DIR: /app/data/product-images
+      QUICKSERVE_MEDIA_MAX_IMAGE_BYTES: ${QUICKSERVE_MEDIA_MAX_IMAGE_BYTES:-5242880}
+    volumes:
+      - product_images:/app/data/product-images
+    expose:
+      - "8081"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - edge
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      EDGE_LAN_HOSTNAME: ${EDGE_LAN_HOSTNAME:-edge.local}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../../edge_frontend/build/web:/srv/edge_frontend:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  # Cloudflare Tunnel
+  #
+  # İki mod destekleniyor:
+  #
+  # 1) NAMED tunnel (üretim, domain'in Cloudflare'da yönetiliyorsa)
+  #    .env içinde CLOUDFLARED_TUNNEL_TOKEN doldur, command bloğunu
+  #    aşağıdaki gibi değiştir:
+  #      command: ["tunnel", "--no-autoupdate", "run", "--token", "${CLOUDFLARED_TUNNEL_TOKEN}"]
+  #    QUICKSERVE_PUBLIC_EDGE_URL'i Cloudflare panelindeki hostname'e set et.
+  #
+  # 2) QUICK tunnel (test, domain yok)
+  #    Komut aşağıdaki gibi sabit kalır; Cloudflare random bir
+  #    https://*.trycloudflare.com hostname verir. URL'i:
+  #      docker compose logs cloudflared | grep trycloudflare.com
+  #    ile gör; .env içinde QUICKSERVE_PUBLIC_EDGE_URL olarak yapıştır;
+  #    sonra: docker compose up -d --force-recreate edge
+  #    (deploy/scripts/edge-quick-tunnel.sh bu adımları otomatikleştirir.)
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    depends_on:
+      - edge
+    command: ["tunnel", "--no-autoupdate", "--url", "http://edge:8081"]
+
+volumes:
+  postgres_data:
+  product_images:
+  caddy_data:
+  caddy_config:

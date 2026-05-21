@@ -1,0 +1,76 @@
+# QuickServe Cloud — VPS docker-compose
+# Çalıştırma:
+#   1. cp .env.example .env  (değerleri doldur)
+#   2. ../scripts/build-cloud-frontend.sh ile cloud_frontend/build/web üretildiğine emin ol
+#   3. docker compose up -d --build
+#
+# Servisler:
+#   postgres : Cloud verisi
+#   cloud    : Spring Boot Cloud API (8080)
+#   caddy    : Reverse proxy + Let's Encrypt + cloud_frontend statik
+
+name: quickserve-cloud
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-quickserve_cloud}
+      POSTGRES_USER: ${POSTGRES_USER:-quickserve}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-quickserve}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  cloud:
+    build:
+      context: ../..
+      dockerfile: deploy/cloud/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-quickserve_cloud}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-quickserve}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      QUICKSERVE_JWT_SECRET: ${QUICKSERVE_JWT_SECRET}
+      QUICKSERVE_BOOTSTRAP_SUPERADMIN_ENABLED: ${QUICKSERVE_BOOTSTRAP_SUPERADMIN_ENABLED:-false}
+      QUICKSERVE_BOOTSTRAP_SUPERADMIN_EMAIL: ${QUICKSERVE_BOOTSTRAP_SUPERADMIN_EMAIL:-}
+      QUICKSERVE_BOOTSTRAP_SUPERADMIN_PASSWORD: ${QUICKSERVE_BOOTSTRAP_SUPERADMIN_PASSWORD:-}
+      QUICKSERVE_BOOTSTRAP_SUPERADMIN_DISPLAY_NAME: ${QUICKSERVE_BOOTSTRAP_SUPERADMIN_DISPLAY_NAME:-}
+      QUICKSERVE_BOOTSTRAP_RESTAURANT_NAME: ${QUICKSERVE_BOOTSTRAP_RESTAURANT_NAME:-}
+      QUICKSERVE_PUBLIC_CLOUD_URL: ${QUICKSERVE_PUBLIC_CLOUD_URL}
+      QUICKSERVE_GUEST_WEB_BASE_URL: ${QUICKSERVE_GUEST_WEB_BASE_URL:-${QUICKSERVE_PUBLIC_CLOUD_URL}}
+      QUICKSERVE_ADMIN_EDGE_ONLINE_THRESHOLD_SECONDS: ${QUICKSERVE_ADMIN_EDGE_ONLINE_THRESHOLD_SECONDS:-180}
+      QUICKSERVE_GUEST_EDGE_PROXY_TIMEOUT_SECONDS: ${QUICKSERVE_GUEST_EDGE_PROXY_TIMEOUT_SECONDS:-15}
+    expose:
+      - "8080"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - cloud
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      CLOUD_HOSTNAME: ${CLOUD_HOSTNAME}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../../cloud_frontend/build/web:/srv/cloud_frontend:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

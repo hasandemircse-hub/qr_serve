@@ -1,0 +1,52 @@
+# QuickServe Edge — LAN reverse proxy (personel için)
+#
+# Personel (garson, kasa, mutfak, admin) restoran içindeki cihazlardan
+# https://EDGE_LAN_HOSTNAME ile erişir. cloudflared sidecar ayrı bir
+# public hostname (ör. edge-r1.tunnel.example.com) üzerinden misafir
+# trafiğini Edge'e taşır; o trafik için Caddy değil, cloudflared yetkilidir.
+#
+# Burada Caddy yerel adlandırmada self-signed sertifika veya plain HTTP
+# kullanır. LAN içindeki cihazlara IP üzerinden erişim için aşağıdaki
+# `:80` ve `:443` blokları çalışır.
+
+{
+	# LAN'da Let's Encrypt yapılamaz; internal sertifika otoritesi kullan.
+	auto_https disable_redirects
+}
+
+# Hostname tabanlı erişim (DNS varsa)
+{$EDGE_LAN_HOSTNAME} {
+	tls internal
+	encode zstd gzip
+
+	@api {
+		path /api/* /ws/* /guest/*
+	}
+	handle @api {
+		reverse_proxy edge:8081
+	}
+
+	handle {
+		root * /srv/edge_frontend
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# IP üzerinden erişim (DNS yoksa) — http://<edge-ip>
+:80 {
+	encode zstd gzip
+
+	@api {
+		path /api/* /ws/* /guest/*
+	}
+	handle @api {
+		reverse_proxy edge:8081
+	}
+
+	handle {
+		root * /srv/edge_frontend
+		try_files {path} /index.html
+		file_server
+	}
+}

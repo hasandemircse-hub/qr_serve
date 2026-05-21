@@ -1,0 +1,16 @@
+**/target/
+**/build/
+**/.gradle/
+**/node_modules/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.idea/
+**/.vscode/
+**/.git/
+**/data/
+**/*.log
+edge_frontend/build/
+cloud_frontend/build/
+deploy/**/data/
+deploy/**/.env

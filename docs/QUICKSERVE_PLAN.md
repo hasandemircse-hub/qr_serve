@@ -1,6 +1,6 @@
 # QuickServe — Canlı Ürün ve Teknik Plan
 
-**Son güncelleme:** 2026-05-19  
+**Son güncelleme:** 2026-05-21  
 **Amaç:** Ürün vizyonu, mimari hedefler ve *gerçek kod tabanı durumu* tek yerde; her anlamlı iş sonrası güncellenir. Cursor / AI ve ekip bu dosyayı referans alır.
 
 ---
@@ -157,7 +157,8 @@
 | `edge_frontend` | Personel: login, admin (kat/QR/**menü**/seçenek/personel), garson/mutfak/kasa Edge API ile **kısmen** bağlı; setup sihirbazı. **Misafir:** `/guest-lab`, `/guest/qr` (giriş gerektirmez). |
 | `cloud_frontend` | Süperadmin: login + restoran listesi/abonelik + Edge çevrimiçi durumu + restoran oluşturma/silme. |
 | `config/` | Örnek `quickserve-config.sample.yaml`. |
-| `docs/` | [QUICKSERVE_PLAN.md](./QUICKSERVE_PLAN.md), [CLOUD_EDGE_INTERNET.md](./CLOUD_EDGE_INTERNET.md) (Cloud↔Edge internet / tunnel / URL’ler). |
+| `docs/` | [QUICKSERVE_PLAN.md](./QUICKSERVE_PLAN.md), [CLOUD_EDGE_INTERNET.md](./CLOUD_EDGE_INTERNET.md), [DEPLOY_TEST.md](./DEPLOY_TEST.md) (ilk test deploy adımları). |
+| `deploy/` | Docker + Caddy + Cloudflare Tunnel paketleri: `deploy/cloud`, `deploy/edge`, `deploy/scripts`. |
 
 ---
 
@@ -179,6 +180,9 @@
 
 | Tarih | Özet | Modül |
 |-------|------|--------|
+| 2026-05-21 | Cloud bootstrap: `SuperadminBootstrapRunner` açılışta DB'de süperadmin yoksa `QUICKSERVE_BOOTSTRAP_SUPERADMIN_*` env değerlerinden süperadmin (+ opsiyonel restoran) yaratır; varsa atlar. Prod deploy'da `migration-local` seed yerine bunu kullanıyoruz. | cloud, deploy, docs |
+| 2026-05-21 | Domainsiz test deploy: Cloud için `nip.io` (`<vps-ip>.nip.io`) + Edge için Cloudflare Quick Tunnel (`*.trycloudflare.com`); `deploy/scripts/edge-quick-tunnel.sh` otomatik URL yakalama ve `.env` güncelleme; DEPLOY_TEST.md A/B akış matrisi. | docs, deploy |
+| 2026-05-21 | İlk test deploy paketi: `deploy/cloud` (Cloud + Caddy + Postgres), `deploy/edge` (Edge + Caddy + Postgres + cloudflared sidecar), Spring `prod` profilleri (env-driven secrets, multipart 10 MB), Flutter Web `EDGE_BASE_URL`/`CLOUD_BASE_URL` dart-define + boş değerle aynı-origin desteği, [DEPLOY_TEST.md](./DEPLOY_TEST.md) adım adım rehber. | docs, deploy, cloud, edge, edge_frontend, cloud_frontend |
 | 2026-05-19 | Dokümantasyon: [CLOUD_EDGE_INTERNET.md](./CLOUD_EDGE_INTERNET.md) — internette Cloud↔Edge trafik hatları, URL config, tunnel/port-forward, prod checklist, sorun giderme. | docs |
 | 2026-05-19 | Ürün resmi: `products.image_path` (V19), `ProductImageService` + public media endpoint; admin `POST/DELETE …/products/{id}/image`; `imageUrl` misafir/garson/admin menü DTO’larında; Flutter admin (yükle/kaldır + küçük resim), misafir QR ve garson menü kartlarında görsel. | common, edge, edge_frontend, docs |
 | 2026-05-19 | Menü sıralama: `sort_index` (V18) menü/ürün; `PUT …/reorder` API’leri; admin Menü + Seçenekler ekranında sürükle-bırak. | common, edge, edge_frontend, docs |

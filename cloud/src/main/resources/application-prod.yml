@@ -1,20 +1,65 @@
-# JWT canlı ortam (aynı gizli anahtar Edge ile paylaşılmalıdır):
-#   QUICKSERVE_JWT_SECRET=<en az 32 karakter>
-quickserve:
-  jwt:
-    secret: ${QUICKSERVE_JWT_SECRET}
-    expiration-hours: 24
+# QuickServe Cloud — prod profili
+# Tüm sırlar ve URL'ler ortam değişkeninden gelir.
+# docker-compose ile uyumlu ad alanları kullanır.
 
-# Canlı ortam: PostgreSQL bağlantısı ortam değişkenleri ile verilir.
-# Örnek:
-#   SPRING_DATASOURCE_URL=jdbc:postgresql://host:5432/quickserve_cloud
-#   SPRING_DATASOURCE_USERNAME=...
-#   SPRING_DATASOURCE_PASSWORD=...
+server:
+  port: 8080
+  forward-headers-strategy: native
+  tomcat:
+    max-http-form-post-size: 10MB
+
 spring:
+  application:
+    name: quickserve-cloud
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
   flyway:
+    enabled: true
     locations: classpath:db/migration
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+quickserve:
+  jwt:
+    secret: ${QUICKSERVE_JWT_SECRET}
+    expiration-hours: ${QUICKSERVE_JWT_EXPIRATION_HOURS:24}
+  # İlk kurulum (idempotent):
+  # - enabled=true ve DB'de süperadmin yoksa, açılışta bu değerlerle oluşturur.
+  # - Süperadmin zaten varsa hiçbir şey yapmaz.
+  # - restaurant.name doluysa ilk restoranı da oluşturur (sadece süperadmin yoksa).
+  bootstrap:
+    superadmin:
+      enabled: ${QUICKSERVE_BOOTSTRAP_SUPERADMIN_ENABLED:false}
+      email: ${QUICKSERVE_BOOTSTRAP_SUPERADMIN_EMAIL:}
+      password: ${QUICKSERVE_BOOTSTRAP_SUPERADMIN_PASSWORD:}
+      display-name: ${QUICKSERVE_BOOTSTRAP_SUPERADMIN_DISPLAY_NAME:Süper Yönetici}
+    restaurant:
+      name: ${QUICKSERVE_BOOTSTRAP_RESTAURANT_NAME:}
+  public-cloud-url: ${QUICKSERVE_PUBLIC_CLOUD_URL}
+  guest:
+    web-base-url: ${QUICKSERVE_GUEST_WEB_BASE_URL:}
+    edge-proxy-timeout-seconds: ${QUICKSERVE_GUEST_EDGE_PROXY_TIMEOUT_SECONDS:15}
+  admin:
+    edge-online-threshold-seconds: ${QUICKSERVE_ADMIN_EDGE_ONLINE_THRESHOLD_SECONDS:180}
