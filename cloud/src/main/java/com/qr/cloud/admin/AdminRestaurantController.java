@@ -62,7 +62,8 @@ public class AdminRestaurantController {
 				null,
 				null,
 				null,
-				EdgeConnectivityStatus.NEVER_SEEN);
+				EdgeConnectivityStatus.NEVER_SEEN,
+				null);
 	}
 
 	@PatchMapping("/{id}/subscription")

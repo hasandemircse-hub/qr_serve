@@ -42,6 +42,11 @@ public final class MockCloudGateway implements CloudGateway {
 	}
 
 	@Override
+	public List<SyncEntityEnvelope> fetchChanges(UUID restaurantId, LocalDateTime since) {
+		return List.of();
+	}
+
+	@Override
 	public boolean ping() {
 		return true;
 	}

@@ -24,6 +24,9 @@ public class EdgeLocalSyncState {
 	@Column(name = "cloud_watermark_at", nullable = false)
 	private LocalDateTime cloudWatermarkAt;
 
+	@Column(name = "last_cloud_pulled_at")
+	private LocalDateTime lastCloudPulledAt;
+
 	@Column(name = "setup_wizard_completed", nullable = false)
 	private Boolean setupWizardCompleted = true;
 
@@ -51,6 +54,14 @@ public class EdgeLocalSyncState {
 
 	public void setCloudWatermarkAt(LocalDateTime cloudWatermarkAt) {
 		this.cloudWatermarkAt = cloudWatermarkAt;
+	}
+
+	public LocalDateTime getLastCloudPulledAt() {
+		return lastCloudPulledAt;
+	}
+
+	public void setLastCloudPulledAt(LocalDateTime lastCloudPulledAt) {
+		this.lastCloudPulledAt = lastCloudPulledAt;
 	}
 
 	public Boolean getSetupWizardCompleted() {

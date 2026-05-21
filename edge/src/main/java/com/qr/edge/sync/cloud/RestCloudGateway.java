@@ -1,5 +1,7 @@
 package com.qr.edge.sync.cloud;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 
@@ -60,6 +62,22 @@ public final class RestCloudGateway implements CloudGateway {
 				.uri("/api/v1/sync/bootstrap?restaurantId={restaurantId}", restaurantId)
 				.retrieve()
 				.body(SyncBootstrapResponse.class);
+		return body == null || body.items() == null ? List.of() : body.items();
+	}
+
+	@Override
+	public List<SyncEntityEnvelope> fetchChanges(UUID restaurantId, LocalDateTime since) {
+		var uriSpec = restClient.get();
+		SyncBootstrapResponse body = since == null
+				? uriSpec
+						.uri("/api/v1/sync/changes?restaurantId={restaurantId}", restaurantId)
+						.retrieve()
+						.body(SyncBootstrapResponse.class)
+				: uriSpec
+						.uri("/api/v1/sync/changes?restaurantId={restaurantId}&since={since}",
+								restaurantId, since.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
+						.retrieve()
+						.body(SyncBootstrapResponse.class);
 		return body == null || body.items() == null ? List.of() : body.items();
 	}
 

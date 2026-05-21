@@ -64,7 +64,8 @@ public class AdminEdgeMonitoringService {
 					null,
 					null,
 					null,
-					EdgeConnectivityStatus.NEVER_SEEN);
+					EdgeConnectivityStatus.NEVER_SEEN,
+					null);
 		}
 		LocalDateTime lastHello = checkpoint.getLastHelloAt();
 		EdgeConnectivityStatus status = resolveStatus(lastHello, now);
@@ -76,7 +77,8 @@ public class AdminEdgeMonitoringService {
 				checkpoint.getPublicEdgeUrl(),
 				lastHello,
 				checkpoint.getLastAcknowledgedUpdatedAt(),
-				status);
+				status,
+				checkpoint.getSoftwareVersion());
 	}
 
 	private EdgeConnectivityStatus resolveStatus(LocalDateTime lastHelloAt, LocalDateTime now) {

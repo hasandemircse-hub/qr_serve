@@ -124,7 +124,31 @@ public class CloudSyncService {
 		checkpoint.setPublicEdgeUrl(request.publicEdgeUrl());
 		checkpoint.setLastHelloAt(now);
 		checkpoint.setRegisteredRestaurantId(request.restaurantId());
+		if (request.softwareVersion() != null && !request.softwareVersion().isBlank()) {
+			checkpoint.setSoftwareVersion(request.softwareVersion().trim());
+		}
 		checkpointRepository.save(checkpoint);
+	}
+
+	/**
+	 * Edge'in periyodik Cloud→Edge incremental pull'unda kullanılır.
+	 * since=null veya EPOCH → tam snapshot (bootstrap eşdeğeri).
+	 * Aksi halde yalnızca updatedAt > since olan envelope'lar döner.
+	 */
+	@Transactional(readOnly = true)
+	public List<SyncEntityEnvelope> changesSince(UUID restaurantId, LocalDateTime since) {
+		List<SyncEntityEnvelope> all = buildBootstrapSnapshot(restaurantId);
+		if (since == null) {
+			return all;
+		}
+		List<SyncEntityEnvelope> filtered = new ArrayList<>();
+		for (SyncEntityEnvelope env : all) {
+			LocalDateTime updatedAt = syncEntityMergeService.readUpdatedAtFromEnvelope(env);
+			if (updatedAt != null && updatedAt.isAfter(since)) {
+				filtered.add(env);
+			}
+		}
+		return filtered;
 	}
 
 	@Transactional(readOnly = true)

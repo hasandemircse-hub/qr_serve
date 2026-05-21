@@ -1,5 +1,6 @@
 package com.qr.edge.sync.cloud;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -21,6 +22,12 @@ public interface CloudGateway {
 	void postHello(EdgeHelloRequest request);
 
 	List<SyncEntityEnvelope> fetchBootstrap(UUID restaurantId);
+
+	/**
+	 * Cloud → Edge incremental pull. {@code since=null} tam snapshot demektir (bootstrap).
+	 * Aksi halde sadece {@code updatedAt > since} olan envelope'lar döner.
+	 */
+	List<SyncEntityEnvelope> fetchChanges(UUID restaurantId, LocalDateTime since);
 
 	/** Cloud watermark uç noktasına erişilebilir mi. */
 	boolean ping();

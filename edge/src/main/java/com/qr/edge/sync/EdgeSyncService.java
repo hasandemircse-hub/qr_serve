@@ -34,6 +34,8 @@ import com.qr.common.persistence.repository.RestaurantOrderRepository;
 import com.qr.common.persistence.repository.RestaurantRepository;
 import com.qr.common.persistence.repository.UserRepository;
 import com.qr.common.sync.LwwMerge;
+import com.qr.common.sync.SyncApplyResult;
+import com.qr.common.sync.SyncEntityMergeService;
 import com.qr.common.sync.SyncEntityType;
 import com.qr.common.sync.api.SyncEntityEnvelope;
 import com.qr.common.sync.api.SyncPushRequest;
@@ -85,6 +87,8 @@ public class EdgeSyncService {
 
 	private final EdgeLocalSyncStateRepository edgeLocalSyncStateRepository;
 
+	private final SyncEntityMergeService syncEntityMergeService;
+
 	public EdgeSyncService(
 			QuickserveProperties properties,
 			CloudGateway cloudGateway,
@@ -101,7 +105,8 @@ public class EdgeSyncService {
 			PaymentRepository paymentRepository,
 			UserRepository userRepository,
 			SyncOutboxRepository syncOutboxRepository,
-			EdgeLocalSyncStateRepository edgeLocalSyncStateRepository) {
+			EdgeLocalSyncStateRepository edgeLocalSyncStateRepository,
+			SyncEntityMergeService syncEntityMergeService) {
 		this.properties = properties;
 		this.cloudGateway = cloudGateway;
 		this.objectMapper = objectMapper;
@@ -118,6 +123,7 @@ public class EdgeSyncService {
 		this.userRepository = userRepository;
 		this.syncOutboxRepository = syncOutboxRepository;
 		this.edgeLocalSyncStateRepository = edgeLocalSyncStateRepository;
+		this.syncEntityMergeService = syncEntityMergeService;
 	}
 
 	public void runSyncCycle() {
@@ -126,8 +132,79 @@ public class EdgeSyncService {
 		}
 		drainOutbox();
 		refreshWatermarkFromCloud();
+		pullChangesFromCloud();
 		enqueuePendingChanges();
 		drainOutbox();
+	}
+
+	/**
+	 * Cloud'da yapılan değişiklikleri (Cloud süperadmin paneli: yeni user, yeni menü,
+	 * abonelik vs.) Edge'in lokal DB'sine LWW merge ile uygular.
+	 *
+	 * since = en son başarılı pull zamanı. İlk seferinde null → tam snapshot.
+	 */
+	private void pullChangesFromCloud() {
+		UUID restaurantId = properties.getRestaurantId();
+		if (restaurantId == null) {
+			return;
+		}
+		LocalDateTime since;
+		try {
+			EdgeLocalSyncState state = edgeLocalSyncStateRepository
+					.findById(EdgeLocalSyncState.SINGLETON_KEY)
+					.orElse(null);
+			since = state == null ? null : state.getLastCloudPulledAt();
+		} catch (Exception ex) {
+			log.warn("Pull state read failed: {}", ex.getMessage());
+			return;
+		}
+
+		List<SyncEntityEnvelope> items;
+		try {
+			items = cloudGateway.fetchChanges(restaurantId, since);
+		} catch (RuntimeException ex) {
+			log.debug("Cloud pull skipped (likely offline): {}", ex.getMessage());
+			return;
+		}
+		if (items == null || items.isEmpty()) {
+			return;
+		}
+
+		List<SyncEntityEnvelope> sorted = new ArrayList<>(items);
+		sorted.sort(Comparator
+				.comparingInt((SyncEntityEnvelope e) -> e.entityType().mergeOrder())
+				.thenComparing(syncEntityMergeService::readUpdatedAtFromEnvelope));
+
+		LocalDateTime maxUpdatedAt = null;
+		int applied = 0, skipped = 0;
+		for (SyncEntityEnvelope env : sorted) {
+			try {
+				SyncApplyResult r = syncEntityMergeService.applyOne(env);
+				if (r == SyncApplyResult.APPLIED) {
+					applied++;
+				} else {
+					skipped++;
+				}
+				LocalDateTime u = syncEntityMergeService.readUpdatedAtFromEnvelope(env);
+				if (u != null && (maxUpdatedAt == null || u.isAfter(maxUpdatedAt))) {
+					maxUpdatedAt = u;
+				}
+			} catch (Exception ex) {
+				log.warn("Cloud pull apply failed for {}: {}", env.entityType(), ex.getMessage());
+			}
+		}
+
+		if (maxUpdatedAt != null) {
+			final LocalDateTime newWatermark = maxUpdatedAt;
+			transactionTemplate.executeWithoutResult(status -> {
+				EdgeLocalSyncState s = edgeLocalSyncStateRepository
+						.findById(EdgeLocalSyncState.SINGLETON_KEY)
+						.orElseThrow();
+				s.setLastCloudPulledAt(newWatermark);
+				edgeLocalSyncStateRepository.save(s);
+			});
+		}
+		log.info("Cloud pull: applied={} skipped={} newWatermark={}", applied, skipped, maxUpdatedAt);
 	}
 
 	private void refreshWatermarkFromCloud() {

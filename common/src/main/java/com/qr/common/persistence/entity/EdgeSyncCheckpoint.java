@@ -28,6 +28,9 @@ public class EdgeSyncCheckpoint {
 	@Column(name = "registered_restaurant_id", columnDefinition = "uuid")
 	private UUID registeredRestaurantId;
 
+	@Column(name = "software_version", length = 64)
+	private String softwareVersion;
+
 	protected EdgeSyncCheckpoint() {
 	}
 
@@ -70,5 +73,13 @@ public class EdgeSyncCheckpoint {
 
 	public void setRegisteredRestaurantId(UUID registeredRestaurantId) {
 		this.registeredRestaurantId = registeredRestaurantId;
+	}
+
+	public String getSoftwareVersion() {
+		return softwareVersion;
+	}
+
+	public void setSoftwareVersion(String softwareVersion) {
+		this.softwareVersion = softwareVersion;
 	}
 }

@@ -56,4 +56,13 @@ public class SyncController {
 	public SyncBootstrapResponse bootstrap(@RequestParam UUID restaurantId) {
 		return new SyncBootstrapResponse(cloudSyncService.buildBootstrapSnapshot(restaurantId));
 	}
+
+	@GetMapping("/changes")
+	public SyncBootstrapResponse changes(
+			@RequestParam UUID restaurantId,
+			@RequestParam(required = false)
+			@org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME)
+			LocalDateTime since) {
+		return new SyncBootstrapResponse(cloudSyncService.changesSince(restaurantId, since));
+	}
 }

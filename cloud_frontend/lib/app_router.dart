@@ -2,6 +2,7 @@ import 'package:go_router/go_router.dart';
 
 import 'auth/cloud_auth_session.dart';
 import 'ui/cloud_login_screen.dart';
+import 'ui/restaurant_detail_page.dart';
 import 'ui/superadmin_dashboard_page.dart';
 
 GoRouter createCloudRouter(CloudAuthSession auth) {
@@ -23,6 +24,13 @@ GoRouter createCloudRouter(CloudAuthSession auth) {
       GoRoute(
         path: '/',
         builder: (context, state) => SuperadminDashboardPage(auth: auth),
+      ),
+      GoRoute(
+        path: '/restaurants/:id',
+        builder: (context, state) => RestaurantDetailPage(
+          auth: auth,
+          restaurantId: state.pathParameters['id']!,
+        ),
       ),
     ],
   );

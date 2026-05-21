@@ -13,5 +13,6 @@ public record AdminRestaurantOverviewDto(
 		String publicEdgeUrl,
 		LocalDateTime lastHelloAt,
 		LocalDateTime lastAcknowledgedUpdatedAt,
-		EdgeConnectivityStatus edgeStatus) {
+		EdgeConnectivityStatus edgeStatus,
+		String softwareVersion) {
 }

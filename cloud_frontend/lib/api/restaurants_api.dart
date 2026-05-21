@@ -12,6 +12,7 @@ class RestaurantSummary {
     this.lastHelloAt,
     this.lastAcknowledgedUpdatedAt,
     required this.edgeStatus,
+    this.softwareVersion,
   });
 
   final String id;
@@ -22,6 +23,7 @@ class RestaurantSummary {
   final String? lastHelloAt;
   final String? lastAcknowledgedUpdatedAt;
   final String edgeStatus;
+  final String? softwareVersion;
 
   factory RestaurantSummary.fromJson(Map<String, dynamic> j) {
     return RestaurantSummary(
@@ -33,6 +35,7 @@ class RestaurantSummary {
       lastHelloAt: _dateToString(j['lastHelloAt']),
       lastAcknowledgedUpdatedAt: _dateToString(j['lastAcknowledgedUpdatedAt']),
       edgeStatus: j['edgeStatus'] as String? ?? 'NEVER_SEEN',
+      softwareVersion: j['softwareVersion'] as String?,
     );
   }
 

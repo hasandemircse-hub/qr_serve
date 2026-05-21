@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../api/restaurants_api.dart';
 import '../auth/cloud_auth_session.dart';
@@ -55,34 +56,6 @@ class _SuperadminDashboardPageState extends State<SuperadminDashboardPage> {
       if (mounted) setState(() => _rows = list);
     } catch (e) {
       if (mounted) setState(() => _loadError = '$e');
-    }
-  }
-
-  Future<void> _setStatus(RestaurantSummary r, String status) async {
-    final token = widget.auth.accessToken;
-    if (token == null) return;
-    setState(() => _busyId = r.id);
-    try {
-      await patchRestaurantSubscription(
-        cloudBaseUrl: AppConfig.cloudBaseUrl,
-        accessToken: token,
-        restaurantId: r.id,
-        subscriptionStatus: status,
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('${r.name}: $status')));
-        await _load();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('$e')));
-      }
-    } finally {
-      if (mounted) setState(() => _busyId = null);
     }
   }
 
@@ -388,7 +361,6 @@ class _SuperadminDashboardPageState extends State<SuperadminDashboardPage> {
                 (r) => _RestaurantCard(
                   r: r,
                   busy: _busyId == r.id,
-                  onStatus: (s) => _setStatus(r, s),
                   onDelete: () => _deleteRestaurant(r),
                 ),
               ),
@@ -422,16 +394,12 @@ class _RestaurantCard extends StatelessWidget {
   const _RestaurantCard({
     required this.r,
     required this.busy,
-    required this.onStatus,
     required this.onDelete,
   });
 
   final RestaurantSummary r;
   final bool busy;
-  final void Function(String status) onStatus;
   final VoidCallback onDelete;
-
-  static const _statuses = ['DEMO', 'ACTIVE', 'FROZEN'];
 
   Color _edgeStatusColor(ColorScheme scheme) {
     return switch (r.edgeStatus) {
@@ -446,113 +414,103 @@ class _RestaurantCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: scheme.primaryContainer,
-                  child: Text(r.name.isNotEmpty ? r.name[0] : '?'),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        r.name,
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w600),
-                      ),
-                      Text(
-                        r.id,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Chip(
-                  label: Text(r.subscriptionStatus),
-                  visualDensity: VisualDensity.compact,
-                ),
-                IconButton(
-                  tooltip: 'Sil',
-                  onPressed: busy ? null : onDelete,
-                  icon: const Icon(Icons.delete_outline),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Icon(
-                  Icons.hub_outlined,
-                  size: 18,
-                  color: _edgeStatusColor(scheme),
-                ),
-                const SizedBox(width: 6),
-                Chip(
-                  label: Text('Edge: ${r.edgeStatusLabel}'),
-                  visualDensity: VisualDensity.compact,
-                  backgroundColor: _edgeStatusColor(
-                    scheme,
-                  ).withValues(alpha: 0.12),
-                  labelStyle: TextStyle(
-                    color: _edgeStatusColor(scheme),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-            if (r.edgeId != null) ...[
-              const SizedBox(height: 6),
-              Text(
-                'Edge ID: ${r.edgeId}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-            if (r.publicEdgeUrl != null && r.publicEdgeUrl!.isNotEmpty) ...[
-              Text(
-                'URL: ${r.publicEdgeUrl}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-            if (r.lastHelloAt != null)
-              Text(
-                'Son sinyal: ${r.lastHelloAt}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            if (r.lastAcknowledgedUpdatedAt != null)
-              Text(
-                'Son sync ack: ${r.lastAcknowledgedUpdatedAt}',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-            const SizedBox(height: 12),
-            Text('Abonelik', style: Theme.of(context).textTheme.labelLarge),
-            const SizedBox(height: 8),
-            if (busy)
-              const LinearProgressIndicator()
-            else
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: busy ? null : () => context.go('/restaurants/${r.id}'),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  for (final s in _statuses)
-                    if (s != r.subscriptionStatus)
-                      OutlinedButton(
-                        onPressed: () => onStatus(s),
-                        child: Text(s),
-                      ),
+                  CircleAvatar(
+                    backgroundColor: scheme.primaryContainer,
+                    child: Text(r.name.isNotEmpty ? r.name[0] : '?'),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          r.name,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        Text(
+                          r.id,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: scheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Chip(
+                    label: Text(r.subscriptionStatus),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  IconButton(
+                    tooltip: 'Detay',
+                    onPressed: busy
+                        ? null
+                        : () => context.go('/restaurants/${r.id}'),
+                    icon: const Icon(Icons.chevron_right),
+                  ),
+                  IconButton(
+                    tooltip: 'Sil',
+                    onPressed: busy ? null : onDelete,
+                    icon: const Icon(Icons.delete_outline),
+                  ),
                 ],
               ),
-          ],
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Icon(
+                    Icons.hub_outlined,
+                    size: 18,
+                    color: _edgeStatusColor(scheme),
+                  ),
+                  const SizedBox(width: 6),
+                  Chip(
+                    label: Text('Edge: ${r.edgeStatusLabel}'),
+                    visualDensity: VisualDensity.compact,
+                    backgroundColor: _edgeStatusColor(
+                      scheme,
+                    ).withValues(alpha: 0.12),
+                    labelStyle: TextStyle(
+                      color: _edgeStatusColor(scheme),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (r.softwareVersion != null) ...[
+                    const SizedBox(width: 8),
+                    Chip(
+                      label: Text('v${r.softwareVersion}'),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
+                ],
+              ),
+              if (r.publicEdgeUrl != null && r.publicEdgeUrl!.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  r.publicEdgeUrl!,
+                  style: Theme.of(context).textTheme.bodySmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+              if (r.lastHelloAt != null)
+                Text(
+                  'Son sinyal: ${r.lastHelloAt}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              const SizedBox(height: 10),
+              if (busy) const LinearProgressIndicator(),
+            ],
+          ),
         ),
       ),
     );
