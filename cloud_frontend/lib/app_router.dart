@@ -1,6 +1,7 @@
 import 'package:go_router/go_router.dart';
 
 import 'auth/cloud_auth_session.dart';
+import 'guest/guest_qr_menu_screen.dart';
 import 'ui/cloud_login_screen.dart';
 import 'ui/restaurant_detail_page.dart';
 import 'ui/superadmin_dashboard_page.dart';
@@ -10,8 +11,10 @@ GoRouter createCloudRouter(CloudAuthSession auth) {
     initialLocation: '/login',
     refreshListenable: auth,
     redirect: (context, state) {
-      final loggedIn = auth.isLoggedIn;
       final loc = state.uri.path;
+      // Misafir QR sayfaları kimlik doğrulama istemez (token URL'in içinde).
+      if (loc.startsWith('/guest/')) return null;
+      final loggedIn = auth.isLoggedIn;
       if (!loggedIn && loc != '/login') return '/login';
       if (loggedIn && loc == '/login') return '/';
       return null;
@@ -31,6 +34,17 @@ GoRouter createCloudRouter(CloudAuthSession auth) {
           auth: auth,
           restaurantId: state.pathParameters['id']!,
         ),
+      ),
+      GoRoute(
+        path: '/guest/qr',
+        builder: (context, state) {
+          final qp = state.uri.queryParameters;
+          return GuestQrMenuScreen(
+            restaurantId: qp['r'] ?? '',
+            tableId: qp['t'] ?? '',
+            token: qp['k'] ?? '',
+          );
+        },
       ),
     ],
   );
