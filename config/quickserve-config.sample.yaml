@@ -1,5 +1,8 @@
 # Bu dosyayı kopyalayıp `config/quickserve-config.yaml` olarak kaydedin (repo kökü).
 # Edge çalışma dizini workspace kökü olduğunda `spring.config.import` bu dosyayı yükler.
+#
+# İnternet / Cloud↔Edge altyapısı (public URL, tunnel, firewall):
+#   docs/CLOUD_EDGE_INTERNET.md
 
 quickserve:
   mode: FULL_STACK

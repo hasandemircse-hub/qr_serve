@@ -18,7 +18,7 @@
 
 | İlke | Hedef (ürün metni) | Kod / durum özeti |
 |------|-------------------|-------------------|
-| **Cloud–Edge hibrit** | Merkez Cloud + restoran başına Edge (RPi vb.) | `cloud` ve `edge` Spring Boot modülleri; `common` ortak domain/sync. **Misafir internet trafiği:** şu an demo/lab’da doğrudan Edge; **hedef** QR ve misafir oturumunun Cloud üzerinden yönetilip siparişin ilgili Edge’e yönlendirilmesi (public guest BFF — kodda henüz yok). |
+| **Cloud–Edge hibrit** | Merkez Cloud + restoran başına Edge (RPi vb.) | `cloud` ve `edge` Spring Boot modülleri; `common` ortak domain/sync. Misafir internet: Cloud BFF REST proxy + QR redirect (**kısmen**); Edge’e WS doğrudan. **Altyapı rehberi:** [CLOUD_EDGE_INTERNET.md](./CLOUD_EDGE_INTERNET.md). |
 | **Offline-first** | İnternet kesilince yerel işlem devam | Edge DB + senkron outbox deseni; tam “kesinti simülasyonu” test senaryosu dokümante değil. |
 | **Akıllı senkron** | UUID, LWW, initial sync, anlık push | UUID + `SyncEntityMergeService` (LWW) Cloud/Edge’te; `POST …/sync/edge/hello`, `GET …/sync/bootstrap`, Edge `EdgeDiscoveryService`. |
 | **Real-time (LAN)** | Garson / mutfak / kasa anlık | Mutfak `/ws/v1/kitchen/push`; garson `/ws/v1/waiter/push` (hazır satır); kasa `/ws/v1/cashier/push` (yeni sipariş + liste yenileme). Kat planı canlılığı **kısmen**. |
@@ -157,6 +157,7 @@
 | `edge_frontend` | Personel: login, admin (kat/QR/**menü**/seçenek/personel), garson/mutfak/kasa Edge API ile **kısmen** bağlı; setup sihirbazı. **Misafir:** `/guest-lab`, `/guest/qr` (giriş gerektirmez). |
 | `cloud_frontend` | Süperadmin: login + restoran listesi/abonelik + Edge çevrimiçi durumu + restoran oluşturma/silme. |
 | `config/` | Örnek `quickserve-config.sample.yaml`. |
+| `docs/` | [QUICKSERVE_PLAN.md](./QUICKSERVE_PLAN.md), [CLOUD_EDGE_INTERNET.md](./CLOUD_EDGE_INTERNET.md) (Cloud↔Edge internet / tunnel / URL’ler). |
 
 ---
 
@@ -178,6 +179,7 @@
 
 | Tarih | Özet | Modül |
 |-------|------|--------|
+| 2026-05-19 | Dokümantasyon: [CLOUD_EDGE_INTERNET.md](./CLOUD_EDGE_INTERNET.md) — internette Cloud↔Edge trafik hatları, URL config, tunnel/port-forward, prod checklist, sorun giderme. | docs |
 | 2026-05-19 | Ürün resmi: `products.image_path` (V19), `ProductImageService` + public media endpoint; admin `POST/DELETE …/products/{id}/image`; `imageUrl` misafir/garson/admin menü DTO’larında; Flutter admin (yükle/kaldır + küçük resim), misafir QR ve garson menü kartlarında görsel. | common, edge, edge_frontend, docs |
 | 2026-05-19 | Menü sıralama: `sort_index` (V18) menü/ürün; `PUT …/reorder` API’leri; admin Menü + Seçenekler ekranında sürükle-bırak. | common, edge, edge_frontend, docs |
 | 2026-05-19 | Garson servis çıkışı: `POST …/waiter/orders/{id}/lines/{id}/delivered` → `KitchenLineStatus.DELIVERED`; hazır paneli Edge’e yazar. | edge, common, edge_frontend, docs |
