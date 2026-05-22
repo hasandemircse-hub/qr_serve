@@ -10,7 +10,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import com.qr.common.config.JwtProperties;
 import com.qr.edge.config.QuickserveProperties;
 
-@SpringBootApplication(scanBasePackages = { "com.qr.edge", "com.qr.common.sync" })
+@SpringBootApplication(scanBasePackages = { "com.qr.edge", "com.qr.common.sync", "com.qr.common.validation" })
 @EnableAsync
 @EnableConfigurationProperties({ QuickserveProperties.class, JwtProperties.class })
 @EnableScheduling

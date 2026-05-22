@@ -8,7 +8,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import com.qr.cloud.config.CloudQuickserveProperties;
 import com.qr.common.config.JwtProperties;
 
-@SpringBootApplication(scanBasePackages = { "com.qr.cloud", "com.qr.common.sync" })
+@SpringBootApplication(scanBasePackages = { "com.qr.cloud", "com.qr.common.sync", "com.qr.common.validation" })
 @EnableConfigurationProperties({ JwtProperties.class, CloudQuickserveProperties.class })
 @EnableMethodSecurity
 public class CloudApplication {

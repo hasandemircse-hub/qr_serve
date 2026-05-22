@@ -27,6 +27,15 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-validation</artifactId>
 		</dependency>
+		<!--
+			JSON Schema 2020-12 validator (Jackson 2.x uyumlu).
+			3.x serisi Jackson 3 gerektirdiği için Spring Boot 3 ile uyumsuz; 1.5.9 stabil.
+		-->
+		<dependency>
+			<groupId>com.networknt</groupId>
+			<artifactId>json-schema-validator</artifactId>
+			<version>1.5.9</version>
+		</dependency>
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
 			<artifactId>jjwt-api</artifactId>

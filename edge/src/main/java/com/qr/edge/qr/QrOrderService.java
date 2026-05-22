@@ -40,6 +40,7 @@ import com.qr.common.persistence.repository.ProductOptionRepository;
 import com.qr.common.persistence.repository.ProductRepository;
 import com.qr.common.persistence.repository.RestaurantOrderRepository;
 import com.qr.common.persistence.repository.RestaurantRepository;
+import com.qr.common.validation.SelectedOptionsSchemaValidator;
 import com.qr.edge.guest.events.GuestOrderPlacedEvent;
 import com.qr.edge.layout.FloorLayoutService;
 import com.qr.edge.qr.api.CreateQrOrderRequest;
@@ -74,6 +75,8 @@ public class QrOrderService {
 
 	private final FloorLayoutService floorLayoutService;
 
+	private final SelectedOptionsSchemaValidator selectedOptionsValidator;
+
 	public QrOrderService(
 			Clock clock,
 			ObjectMapper objectMapper,
@@ -86,7 +89,8 @@ public class QrOrderService {
 			RestaurantOrderRepository restaurantOrderRepository,
 			OrderLineItemRepository orderLineItemRepository,
 			ApplicationEventPublisher eventPublisher,
-			FloorLayoutService floorLayoutService) {
+			FloorLayoutService floorLayoutService,
+			SelectedOptionsSchemaValidator selectedOptionsValidator) {
 		this.clock = clock;
 		this.objectMapper = objectMapper;
 		this.restaurantRepository = restaurantRepository;
@@ -99,6 +103,7 @@ public class QrOrderService {
 		this.orderLineItemRepository = orderLineItemRepository;
 		this.eventPublisher = eventPublisher;
 		this.floorLayoutService = floorLayoutService;
+		this.selectedOptionsValidator = selectedOptionsValidator;
 	}
 
 	@Transactional
@@ -171,16 +176,16 @@ public class QrOrderService {
 	}
 
 	private NormalizedOptions normalizeSelectedOptions(JsonNode root, UUID productId) {
-		if (root == null || !root.isObject()) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "selectedOptions must be an object");
+		// 1. Yapısal/JSON Schema doğrulaması (erken hata yakalama, frontend kontrat ihlali).
+		String schemaError = selectedOptionsValidator.validate(root);
+		if (schemaError != null) {
+			throw new ResponseStatusException(
+					HttpStatus.BAD_REQUEST,
+					"selectedOptions failed schema validation: " + schemaError);
 		}
-		if (!root.has("schemaVersion") || root.get("schemaVersion").asInt() != 1) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "selectedOptions.schemaVersion must be 1");
-		}
+		// 2. Domain doğrulaması: alttaki kod ürünün gerçek option group/option DB
+		//    kayıtlarıyla cross-check yapar (şema bunu bilemez).
 		JsonNode stepsNode = root.get("steps");
-		if (stepsNode == null || !stepsNode.isArray()) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "selectedOptions.steps must be an array");
-		}
 		List<ProductOptionGroup> groups = productOptionGroupRepository
 				.findByProductIdAndIsDeletedFalseOrderBySortIndexAsc(productId);
 		if (groups.isEmpty()) {
