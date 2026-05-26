@@ -26,3 +26,6 @@ logs/
 
 # --- OS ---
 Thumbs.db
+
+# Deploy config (secrets / VPS host)
+deploy/.deploy-config

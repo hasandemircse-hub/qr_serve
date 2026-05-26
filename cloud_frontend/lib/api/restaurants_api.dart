@@ -168,3 +168,79 @@ Future<void> deleteRestaurant({
     throw Exception('Silme (${res.statusCode}): ${res.body}');
   }
 }
+
+class EdgeHealthCheckResult {
+  EdgeHealthCheckResult({
+    required this.restaurantId,
+    required this.heartbeatStatus,
+    this.testedUrl,
+    required this.reachable,
+    this.httpStatusCode,
+    this.responseTimeMillis,
+    this.reportedEdgeId,
+    this.reportedRestaurantId,
+    required this.edgeIdMatches,
+    required this.restaurantIdMatches,
+    this.errorCode,
+    this.errorMessage,
+    this.checkedAt,
+  });
+
+  final String restaurantId;
+  final String heartbeatStatus;
+  final String? testedUrl;
+  final bool reachable;
+  final int? httpStatusCode;
+  final int? responseTimeMillis;
+  final String? reportedEdgeId;
+  final String? reportedRestaurantId;
+  final bool edgeIdMatches;
+  final bool restaurantIdMatches;
+  final String? errorCode;
+  final String? errorMessage;
+  final String? checkedAt;
+
+  factory EdgeHealthCheckResult.fromJson(Map<String, dynamic> j) {
+    return EdgeHealthCheckResult(
+      restaurantId: j['restaurantId'].toString(),
+      heartbeatStatus: j['heartbeatStatus'] as String? ?? 'NEVER_SEEN',
+      testedUrl: j['testedUrl'] as String?,
+      reachable: j['reachable'] as bool? ?? false,
+      httpStatusCode: (j['httpStatusCode'] as num?)?.toInt(),
+      responseTimeMillis: (j['responseTimeMillis'] as num?)?.toInt(),
+      reportedEdgeId: j['reportedEdgeId']?.toString(),
+      reportedRestaurantId: j['reportedRestaurantId']?.toString(),
+      edgeIdMatches: j['edgeIdMatches'] as bool? ?? false,
+      restaurantIdMatches: j['restaurantIdMatches'] as bool? ?? false,
+      errorCode: j['errorCode'] as String?,
+      errorMessage: j['errorMessage'] as String?,
+      checkedAt: _dateToString(j['checkedAt']),
+    );
+  }
+}
+
+Future<EdgeHealthCheckResult> runEdgeHealthCheck({
+  required String cloudBaseUrl,
+  required String accessToken,
+  required String restaurantId,
+}) async {
+  final root = cloudBaseUrl.endsWith('/')
+      ? cloudBaseUrl.substring(0, cloudBaseUrl.length - 1)
+      : cloudBaseUrl;
+  final uri = Uri.parse(
+    '$root/api/v1/admin/restaurants/$restaurantId/edge-health-check',
+  );
+  final res = await http.post(
+    uri,
+    headers: {
+      'Authorization': 'Bearer $accessToken',
+      'Accept': 'application/json',
+    },
+  );
+  if (res.statusCode != 200) {
+    throw Exception('Sağlık testi (${res.statusCode}): ${res.body}');
+  }
+  return EdgeHealthCheckResult.fromJson(
+    jsonDecode(res.body) as Map<String, dynamic>,
+  );
+}

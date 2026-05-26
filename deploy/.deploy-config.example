@@ -1,0 +1,21 @@
+# QuickServe deploy script yapılandırması.
+# Kopyala: cp deploy/.deploy-config.example deploy/.deploy-config
+# `.deploy-config` gitignore'dadır — VPS bilgilerin repo'ya sızmaz.
+
+# VPS adresi (domain veya IP)
+QUICKSERVE_DEPLOY_HOST=qrserve.co
+
+# SSH kullanıcısı
+QUICKSERVE_DEPLOY_USER=root
+
+# Repo'nun VPS'teki kök dizini (içinde cloud_frontend/, deploy/cloud/ olmalı)
+QUICKSERVE_DEPLOY_PATH=/opt/quickserve
+
+# Smoke test için public URL (boş bırakırsan https://$QUICKSERVE_DEPLOY_HOST kullanılır)
+QUICKSERVE_DEPLOY_URL=https://qrserve.co
+
+# Opsiyonel: 1 yaparsan build atlanır (zaten build/web hazırsa)
+# QUICKSERVE_SKIP_BUILD=1
+
+# Opsiyonel: 1 yaparsan onay sormaz (CI/CD için)
+# QUICKSERVE_AUTO_YES=1

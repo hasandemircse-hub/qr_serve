@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.qr.cloud.admin.health.EdgeHealthCheckResult;
+import com.qr.cloud.admin.health.EdgeHealthCheckService;
 import com.qr.common.persistence.entity.Restaurant;
 import com.qr.common.persistence.repository.RestaurantRepository;
 import com.qr.common.security.SubscriptionStatus;
@@ -33,11 +35,15 @@ public class AdminRestaurantController {
 
 	private final AdminEdgeMonitoringService adminEdgeMonitoringService;
 
+	private final EdgeHealthCheckService edgeHealthCheckService;
+
 	public AdminRestaurantController(
 			RestaurantRepository restaurantRepository,
-			AdminEdgeMonitoringService adminEdgeMonitoringService) {
+			AdminEdgeMonitoringService adminEdgeMonitoringService,
+			EdgeHealthCheckService edgeHealthCheckService) {
 		this.restaurantRepository = restaurantRepository;
 		this.adminEdgeMonitoringService = adminEdgeMonitoringService;
+		this.edgeHealthCheckService = edgeHealthCheckService;
 	}
 
 	@GetMapping
@@ -81,6 +87,16 @@ public class AdminRestaurantController {
 		var r = restaurantRepository.findById(id).orElseThrow();
 		r.setIsDeleted(true);
 		restaurantRepository.save(r);
+	}
+
+	/**
+	 * Heartbeat'ten bağımsız olarak Cloud → Edge gerçek erişim testi.
+	 * Cloud, Edge'in public URL'ine doğrudan HTTP isteği atar ve dönen
+	 * kimlik bilgilerini bekleneni ile karşılaştırır.
+	 */
+	@PostMapping("/{id}/edge-health-check")
+	public EdgeHealthCheckResult checkEdgeHealth(@PathVariable UUID id) {
+		return edgeHealthCheckService.check(id);
 	}
 
 	private static String trimToNull(String value) {

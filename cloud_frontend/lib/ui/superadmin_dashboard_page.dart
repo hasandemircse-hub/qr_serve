@@ -59,6 +59,169 @@ class _SuperadminDashboardPageState extends State<SuperadminDashboardPage> {
     }
   }
 
+  Future<void> _runHealthCheck(RestaurantSummary r) async {
+    final token = widget.auth.accessToken;
+    if (token == null || _busyId != null) return;
+    setState(() => _busyId = r.id);
+    EdgeHealthCheckResult? result;
+    String? errorText;
+    try {
+      result = await runEdgeHealthCheck(
+        cloudBaseUrl: AppConfig.cloudBaseUrl,
+        accessToken: token,
+        restaurantId: r.id,
+      );
+    } catch (e) {
+      errorText = '$e';
+    } finally {
+      if (mounted) setState(() => _busyId = null);
+    }
+    if (!mounted) return;
+    if (result != null) {
+      await _showHealthCheckDialog(r, result);
+    } else if (errorText != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(errorText)));
+    }
+  }
+
+  Future<void> _showHealthCheckDialog(
+    RestaurantSummary r,
+    EdgeHealthCheckResult result,
+  ) async {
+    final scheme = Theme.of(context).colorScheme;
+    final ok = result.reachable;
+    final color = ok ? Colors.green.shade700 : scheme.error;
+    final icon = ok ? Icons.check_circle : Icons.error_outline;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(icon, color: color),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(ok ? 'Edge erişilebilir' : 'Edge erişilemiyor'),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                r.name,
+                style: Theme.of(context).textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+              _kv('Heartbeat', _heartbeatLabel(result.heartbeatStatus)),
+              if (result.testedUrl != null) _kv('Test URL', result.testedUrl!),
+              if (result.httpStatusCode != null)
+                _kv('HTTP', '${result.httpStatusCode}'),
+              if (result.responseTimeMillis != null)
+                _kv('Cevap süresi', '${result.responseTimeMillis} ms'),
+              if (result.reportedEdgeId != null)
+                _kv(
+                  'edgeId (gelen)',
+                  result.reportedEdgeId!,
+                  badge: result.edgeIdMatches ? '✓ eşleşti' : '✗ uyuşmuyor',
+                  badgeColor: result.edgeIdMatches
+                      ? Colors.green.shade700
+                      : scheme.error,
+                ),
+              if (result.reportedRestaurantId != null)
+                _kv(
+                  'restaurantId (gelen)',
+                  result.reportedRestaurantId!,
+                  badge: result.restaurantIdMatches
+                      ? '✓ eşleşti'
+                      : '✗ uyuşmuyor',
+                  badgeColor: result.restaurantIdMatches
+                      ? Colors.green.shade700
+                      : scheme.error,
+                ),
+              if (result.errorCode != null)
+                _kv('Hata kodu', result.errorCode!),
+              if (result.errorMessage != null) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: scheme.errorContainer.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    result.errorMessage!,
+                    style: TextStyle(color: scheme.onErrorContainer),
+                  ),
+                ),
+              ],
+              if (result.checkedAt != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Kontrol zamanı: ${result.checkedAt}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Kapat'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _kv(String key, String value, {String? badge, Color? badgeColor}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 140,
+            child: Text(
+              key,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ),
+          Expanded(child: SelectableText(value)),
+          if (badge != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: (badgeColor ?? Colors.green.shade700).withValues(
+                  alpha: 0.15,
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                badge,
+                style: TextStyle(
+                  color: badgeColor ?? Colors.green.shade700,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _heartbeatLabel(String status) => switch (status) {
+    'ONLINE' => 'ONLINE (son sinyal yakın)',
+    'OFFLINE' => 'OFFLINE (son sinyal eski)',
+    _ => 'NEVER_SEEN',
+  };
+
   Future<void> _deleteRestaurant(RestaurantSummary r) async {
     final token = widget.auth.accessToken;
     if (token == null || _busyId != null) return;
@@ -362,6 +525,7 @@ class _SuperadminDashboardPageState extends State<SuperadminDashboardPage> {
                   r: r,
                   busy: _busyId == r.id,
                   onDelete: () => _deleteRestaurant(r),
+                  onHealthCheck: () => _runHealthCheck(r),
                 ),
               ),
           ],
@@ -395,11 +559,13 @@ class _RestaurantCard extends StatelessWidget {
     required this.r,
     required this.busy,
     required this.onDelete,
+    required this.onHealthCheck,
   });
 
   final RestaurantSummary r;
   final bool busy;
   final VoidCallback onDelete;
+  final VoidCallback onHealthCheck;
 
   Color _edgeStatusColor(ColorScheme scheme) {
     return switch (r.edgeStatus) {
@@ -456,6 +622,11 @@ class _RestaurantCard extends StatelessWidget {
                         ? null
                         : () => context.go('/restaurants/${r.id}'),
                     icon: const Icon(Icons.chevron_right),
+                  ),
+                  IconButton(
+                    tooltip: 'Edge sağlık testi (gerçek erişim)',
+                    onPressed: busy ? null : onHealthCheck,
+                    icon: const Icon(Icons.monitor_heart_outlined),
                   ),
                   IconButton(
                     tooltip: 'Sil',

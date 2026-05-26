@@ -42,7 +42,7 @@ Mevcut sistemde "Kısmen" olan ama kritik parçalar + birikmiş teknik borç.
 |---|---|---|---|
 | 1.1 | ~~JSON → JSONB migration + `@JdbcTypeCode(SqlTypes.JSON)`~~ ✅ | 0.5 gün | `stringtype=unspecified` hack'i kaldırıldı (V22 PG-only migration + Hibernate annotation) |
 | 1.2 | Edge ↔ Cloud sync için API key auth (`/api/v1/sync/**`) | 1 gün | Şu an `permitAll` → kötü amaçlı biri Cloud'a fake hello atabilir |
-| 1.3 | Cloud süperadmin Edge sağlık testi (heartbeat'ten bağımsız gerçek proxy test) | 0.5 gün | "ONLINE görünüyor ama gerçekte erişilemiyor" durumunu yakala |
+| 1.3 | ~~Cloud süperadmin Edge sağlık testi (heartbeat'ten bağımsız gerçek proxy test)~~ ✅ | 0.5 gün | `POST /admin/restaurants/{id}/edge-health-check` + cloud_frontend "Sağlık testi" butonu (kalp ikonu): HTTP status, cevap süresi, edgeId/restaurantId uyumu, hata kodu. |
 | 1.4 | QR PDF'ler `qrserve.co` ile yeniden üretim (eskiler nip.io) | 0.5 gün | Şu an üretilen PDF'ler eski URL kullanıyor |
 | 1.5 | E2E test paketi (Playwright veya Selenium) | 2 gün | Müşteri QR → sipariş → kasa → kapanış otomatik test |
 | 1.6 | Yazıcı yönetim UI (kategoriye atama, test yazdırma) | 1 gün | "Kısmen" — kod var, UI yok |
