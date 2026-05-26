@@ -37,8 +37,7 @@ services:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      # stringtype=unspecified: aynı Edge tarafındaki gerekçe (json kolon yazımı)
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-quickserve_cloud}?stringtype=unspecified
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-quickserve_cloud}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-quickserve}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       QUICKSERVE_JWT_SECRET: ${QUICKSERVE_JWT_SECRET}

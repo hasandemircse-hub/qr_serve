@@ -3,6 +3,9 @@ package com.qr.common.persistence.entity;
 import java.math.BigDecimal;
 import java.util.UUID;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.persistence.Column;
@@ -41,7 +44,11 @@ public class OrderLineItem extends BaseEntity {
 	@Column(name = "line_total", nullable = false, precision = 12, scale = 2)
 	private BigDecimal lineTotal;
 
-	@Column(name = "selected_options", nullable = false, columnDefinition = "json")
+	// Prod: JSONB (V22 migration), Local (H2): JSON. @JdbcTypeCode her iki tipte de çalışır.
+	// columnDefinition kaldırıldı çünkü H2 ve PG tip adları farklı; ddl-auto: validate
+	// JDBC tip kodunu (SqlTypes.JSON) referans aldığı için her iki tarafta da geçerli.
+	@Column(name = "selected_options", nullable = false)
+	@JdbcTypeCode(SqlTypes.JSON)
 	private String selectedOptions = "{}";
 
 	@Column(name = "kitchen_line_status", nullable = false, length = 16)

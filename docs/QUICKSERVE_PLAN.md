@@ -180,6 +180,8 @@
 
 | Tarih | Özet | Modül |
 |-------|------|--------|
+| 2026-05-26 | **JSON → JSONB migration (FAZ 1.1):** `order_line_items.selected_options` artık PostgreSQL'de JSONB (V22 `migration-postgresql/`); `OrderLineItem` entity'sine `@JdbcTypeCode(SqlTypes.JSON)` eklendi; her iki `docker-compose.yml`'den `?stringtype=unspecified` hack'i kaldırıldı. Local profil (H2) JSON tipinde kalır — Hibernate annotation iki tarafta da çalışır. Edge testleri 10/10 geçer. | common, edge, cloud, deploy, docs |
+| 2026-05-26 | **Onboarding playbook'ları:** `NEW_RESTAURANT_ONBOARDING.md` (donanım→kurulum→eğitim→bakım) + `REMOTE_EDGE_TEST.md` (uzaktaki bir arkadaşa test Edge kurulumu, Cloudflare Tunnel'ın nasıl bağlandığını da detaylı açıklar). `QUICKSERVE_ROADMAP.md` 6-fazlı yol haritası eklendi. | docs |
 | 2026-05-21 | Cloud bootstrap: `SuperadminBootstrapRunner` açılışta DB'de süperadmin yoksa `QUICKSERVE_BOOTSTRAP_SUPERADMIN_*` env değerlerinden süperadmin (+ opsiyonel restoran) yaratır; varsa atlar. Prod deploy'da `migration-local` seed yerine bunu kullanıyoruz. | cloud, deploy, docs |
 | 2026-05-21 | Domainsiz test deploy: Cloud için `nip.io` (`<vps-ip>.nip.io`) + Edge için Cloudflare Quick Tunnel (`*.trycloudflare.com`); `deploy/scripts/edge-quick-tunnel.sh` otomatik URL yakalama ve `.env` güncelleme; DEPLOY_TEST.md A/B akış matrisi. | docs, deploy |
 | 2026-05-21 | İlk test deploy paketi: `deploy/cloud` (Cloud + Caddy + Postgres), `deploy/edge` (Edge + Caddy + Postgres + cloudflared sidecar), Spring `prod` profilleri (env-driven secrets, multipart 10 MB), Flutter Web `EDGE_BASE_URL`/`CLOUD_BASE_URL` dart-define + boş değerle aynı-origin desteği, [DEPLOY_TEST.md](./DEPLOY_TEST.md) adım adım rehber. | docs, deploy, cloud, edge, edge_frontend, cloud_frontend |

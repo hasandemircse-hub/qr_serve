@@ -39,10 +39,7 @@ services:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      # stringtype=unspecified: String parametreleri Postgres'in kendi cast'iyle çözer
-      # (json/jsonb kolonlara String yazarken PG'nin "column is of type json but expression
-      # is of type character varying" hatasını önler)
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-quickserve_edge}?stringtype=unspecified
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-quickserve_edge}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-quickserve}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       QUICKSERVE_JWT_SECRET: ${QUICKSERVE_JWT_SECRET}

@@ -25,7 +25,10 @@ spring:
           time_zone: UTC
   flyway:
     enabled: true
-    locations: classpath:db/migration
+    # PostgreSQL'e özel migration'lar (örn. JSONB) `migration-postgresql`
+    # paralel klasöründe; local profil (H2) bu location'u yüklemediği için
+    # PG'ye özgü syntax orada izole kalır.
+    locations: classpath:db/migration,classpath:db/migration-postgresql
   servlet:
     multipart:
       max-file-size: 10MB
