@@ -183,6 +183,13 @@ public class QuickserveProperties {
 		/** true iken Cloud REST mocklanır (ONLY_EDGE profili). */
 		private boolean mock = false;
 
+		/**
+		 * Cloud {@code /api/v1/sync/**} endpoint'leri için paylaşılan secret. Cloud
+		 * tarafındaki {@code quickserve.sync.shared-secret} ile birebir eşleşmeli.
+		 * Boşsa Edge başlığı eklemez; Cloud da uyarı log'u ile bypass eder.
+		 */
+		private String syncSharedSecret = "";
+
 		public String getBaseUrl() {
 			return baseUrl;
 		}
@@ -197,6 +204,14 @@ public class QuickserveProperties {
 
 		public void setMock(boolean mock) {
 			this.mock = mock;
+		}
+
+		public String getSyncSharedSecret() {
+			return syncSharedSecret;
+		}
+
+		public void setSyncSharedSecret(String syncSharedSecret) {
+			this.syncSharedSecret = syncSharedSecret;
 		}
 	}
 

@@ -66,3 +66,7 @@ quickserve:
     edge-proxy-timeout-seconds: ${QUICKSERVE_GUEST_EDGE_PROXY_TIMEOUT_SECONDS:15}
   admin:
     edge-online-threshold-seconds: ${QUICKSERVE_ADMIN_EDGE_ONLINE_THRESHOLD_SECONDS:180}
+  # Edge ↔ Cloud sync için paylaşılan secret (Edge tarafında aynı değer kullanılır).
+  # Boşsa /api/v1/sync/** korumasız çalışır + uyarı log'u; doluysa zorunlu.
+  sync:
+    shared-secret: ${QUICKSERVE_SYNC_SHARED_SECRET:}

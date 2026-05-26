@@ -22,7 +22,7 @@
 | **Restoran admin** | ✅ Kullanılabilir | Menü, masa, personel, opsiyonlu ürün |
 | **Personel akışı** | ✅ Kullanılabilir | Garson, mutfak, kasa, masa kapat v2 |
 | **Müşteri QR akışı** | ✅ Kullanılabilir | Menü, sipariş, garson çağır, hesap iste |
-| **Güvenlik** | ⚠️ MVP düzeyi | Auth var, ama Edge-Cloud sync auth eksik, rate limit yok |
+| **Güvenlik** | ⚠️ MVP düzeyi | JWT + Edge-Cloud sync shared-secret ✅; rate limit + per-edge key rotation eksik |
 | **Test** | ⚠️ Birim test var | E2E + load test eksik |
 | **Operasyon** | ⚠️ Manuel | Monitoring/backup/alerting otomatize değil |
 | **Yasal** | ❌ Yok | KVKK, e-fatura, sözleşme, vergi |
@@ -41,7 +41,7 @@ Mevcut sistemde "Kısmen" olan ama kritik parçalar + birikmiş teknik borç.
 | # | İş | Süre | Neden kritik |
 |---|---|---|---|
 | 1.1 | ~~JSON → JSONB migration + `@JdbcTypeCode(SqlTypes.JSON)`~~ ✅ | 0.5 gün | `stringtype=unspecified` hack'i kaldırıldı (V22 PG-only migration + Hibernate annotation) |
-| 1.2 | Edge ↔ Cloud sync için API key auth (`/api/v1/sync/**`) | 1 gün | Şu an `permitAll` → kötü amaçlı biri Cloud'a fake hello atabilir |
+| 1.2 | ~~Edge ↔ Cloud sync için shared-secret auth (`/api/v1/sync/**`)~~ ✅ | 0.5 gün | `X-QuickServe-Sync-Key` header + `SyncSharedSecretFilter` (sabit zamanlı eşitlik). Cloud `QUICKSERVE_SYNC_SHARED_SECRET` env doluysa zorunlu; boşsa geri uyumlu permissive mode + uyarı log'u (cutover kolaylığı). |
 | 1.3 | ~~Cloud süperadmin Edge sağlık testi (heartbeat'ten bağımsız gerçek proxy test)~~ ✅ | 0.5 gün | `POST /admin/restaurants/{id}/edge-health-check` + cloud_frontend "Sağlık testi" butonu (kalp ikonu): HTTP status, cevap süresi, edgeId/restaurantId uyumu, hata kodu. |
 | 1.4 | QR PDF'ler `qrserve.co` ile yeniden üretim (eskiler nip.io) | 0.5 gün | Şu an üretilen PDF'ler eski URL kullanıyor |
 | 1.5 | E2E test paketi (Playwright veya Selenium) | 2 gün | Müşteri QR → sipariş → kasa → kapanış otomatik test |
@@ -87,6 +87,7 @@ Saha gerçekleri için altyapı sertleştirme.
 | 3.6 | Edge cihazlarda otomatik backup (gece 03:00) | 1 gün | Cihaz arızası = veri kaybı olmasın |
 | 3.7 | CI/CD: GitHub Actions (test + build + deploy) | 2 gün | Manuel rsync sürdürülebilir değil |
 | 3.8 | Süperadmin şifre policy + 2FA opsiyonu | 1 gün | Senin hesabın çalınırsa felaket |
+| 3.9 | Per-restoran sync key (global secret → DB'de hash'lenmiş per-edge key) | 0.5 gün | FAZ 1.2'deki global secret blast radius'unu kapatır: bir Edge'in key'i sızsa sadece o etkilenir; rotation tek restoran |
 
 **Çıktı:** "Telefonum kapalıyken bile çalışan" üretim sistemi.
 

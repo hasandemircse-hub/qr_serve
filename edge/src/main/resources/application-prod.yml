@@ -59,6 +59,10 @@ quickserve:
   cloud:
     base-url: ${QUICKSERVE_CLOUD_BASE_URL}
     mock: false
+    # Cloud'un /api/v1/sync/** koruması için paylaşılan secret. Cloud tarafındaki
+    # QUICKSERVE_SYNC_SHARED_SECRET ile aynı olmalı. Boşsa header gönderilmez
+    # (Cloud da o durumda permissive mode'a düşer + uyarı log'u).
+    sync-shared-secret: ${QUICKSERVE_SYNC_SHARED_SECRET:}
   setup:
     wizard-enabled: ${QUICKSERVE_SETUP_WIZARD_ENABLED:false}
   edge:

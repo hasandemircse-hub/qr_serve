@@ -2,6 +2,7 @@
 /Users/hasandemir/Desktop/projects/quickserve/common/src/main/java/com/qr/common/api/auth/LoginResponse.java
 /Users/hasandemir/Desktop/projects/quickserve/common/src/main/java/com/qr/common/auth/JwtAuthenticationFilter.java
 /Users/hasandemir/Desktop/projects/quickserve/common/src/main/java/com/qr/common/auth/JwtService.java
+/Users/hasandemir/Desktop/projects/quickserve/common/src/main/java/com/qr/common/auth/SyncSharedSecretFilter.java
 /Users/hasandemir/Desktop/projects/quickserve/common/src/main/java/com/qr/common/billing/fiscal/FiscalDocumentKind.java
 /Users/hasandemir/Desktop/projects/quickserve/common/src/main/java/com/qr/common/billing/fiscal/FiscalSalesDocumentRequest.java
 /Users/hasandemir/Desktop/projects/quickserve/common/src/main/java/com/qr/common/billing/fiscal/FiscalSubmitResult.java

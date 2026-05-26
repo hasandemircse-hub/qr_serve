@@ -16,6 +16,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.qr.common.auth.JwtAuthenticationFilter;
+import com.qr.common.auth.SyncSharedSecretFilter;
 
 @Configuration
 @Profile("!test")
@@ -47,6 +48,7 @@ public class CloudSecurityConfig {
 	SecurityFilterChain cloudSecurityFilterChain(
 			HttpSecurity http,
 			JwtAuthenticationFilter jwtAuthenticationFilter,
+			SyncSharedSecretFilter syncSharedSecretFilter,
 			CorsConfigurationSource corsConfigurationSource)
 			throws Exception {
 		http.cors(c -> c.configurationSource(corsConfigurationSource))
@@ -55,6 +57,9 @@ public class CloudSecurityConfig {
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 						.requestMatchers("/api/v1/auth/**").permitAll()
+						// SyncSharedSecretFilter bu path için header'ı zorunlu kılar
+						// (secret env'de tanımlıysa); permitAll filter'ı bypass etmez,
+						// sadece Spring Security'nin başka bir auth aramamasını sağlar.
 						.requestMatchers("/api/v1/sync/**").permitAll()
 						.requestMatchers("/api/v1/public/guest/**").permitAll()
 						.requestMatchers(HttpMethod.GET, "/r/**").permitAll()
@@ -62,6 +67,7 @@ public class CloudSecurityConfig {
 						.requestMatchers("/error").permitAll()
 						.requestMatchers("/api/v1/admin/**").hasRole("SUPERADMIN")
 						.anyRequest().authenticated())
+				.addFilterBefore(syncSharedSecretFilter, UsernamePasswordAuthenticationFilter.class)
 				.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 				.headers(h -> h.frameOptions(f -> f.disable()));
 		return http.build();

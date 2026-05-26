@@ -51,6 +51,8 @@ services:
       QUICKSERVE_GUEST_LAB_ENABLED: ${QUICKSERVE_GUEST_LAB_ENABLED:-false}
       QUICKSERVE_MEDIA_PRODUCT_IMAGES_DIR: /app/data/product-images
       QUICKSERVE_MEDIA_MAX_IMAGE_BYTES: ${QUICKSERVE_MEDIA_MAX_IMAGE_BYTES:-5242880}
+      # Edge ↔ Cloud sync auth (Cloud'unkiyle birebir aynı olmalı; boşsa korumasız)
+      QUICKSERVE_SYNC_SHARED_SECRET: ${QUICKSERVE_SYNC_SHARED_SECRET:-}
     volumes:
       - product_images:/app/data/product-images
     expose:
