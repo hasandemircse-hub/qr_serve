@@ -75,29 +75,23 @@ services:
       - caddy_data:/data
       - caddy_config:/config
 
-  # Cloudflare Tunnel
+  # Cloudflare Tunnel — NAMED tunnel modu (üretim).
   #
-  # İki mod destekleniyor:
+  # Token .env içinde `CLOUDFLARED_TUNNEL_TOKEN` olarak saklanır.
+  # Public hostname Cloudflare Zero Trust panelinden tanımlanır
+  # (örn. edge.qrserve.co → http://edge:8081).
   #
-  # 1) NAMED tunnel (üretim, domain'in Cloudflare'da yönetiliyorsa)
-  #    .env içinde CLOUDFLARED_TUNNEL_TOKEN doldur, command bloğunu
-  #    aşağıdaki gibi değiştir:
-  #      command: ["tunnel", "--no-autoupdate", "run", "--token", "${CLOUDFLARED_TUNNEL_TOKEN}"]
-  #    QUICKSERVE_PUBLIC_EDGE_URL'i Cloudflare panelindeki hostname'e set et.
-  #
-  # 2) QUICK tunnel (test, domain yok)
-  #    Komut aşağıdaki gibi sabit kalır; Cloudflare random bir
-  #    https://*.trycloudflare.com hostname verir. URL'i:
-  #      docker compose logs cloudflared | grep trycloudflare.com
-  #    ile gör; .env içinde QUICKSERVE_PUBLIC_EDGE_URL olarak yapıştır;
-  #    sonra: docker compose up -d --force-recreate edge
-  #    (deploy/scripts/edge-quick-tunnel.sh bu adımları otomatikleştirir.)
+  # QUICK tunnel'a geri dönmek istersen (test, domain yok):
+  #   command: ["tunnel", "--no-autoupdate", "--url", "http://edge:8081"]
+  # ve `environment` bloğunu kaldır. URL'i loglardan al.
   cloudflared:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
     depends_on:
       - edge
-    command: ["tunnel", "--no-autoupdate", "--url", "http://edge:8081"]
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARED_TUNNEL_TOKEN}
+    command: ["tunnel", "--no-autoupdate", "run"]
 
 volumes:
   postgres_data:

@@ -14,8 +14,14 @@ class CloudLoginScreen extends StatefulWidget {
 }
 
 class _CloudLoginScreenState extends State<CloudLoginScreen> {
-  final _email = TextEditingController(text: 'superadmin@quickserve.local');
-  final _password = TextEditingController(text: 'demo');
+  // Default credential'lar: süperadmin bootstrap (.env) ile aynı.
+  // İlk login UX kolaylığı için pre-fill ediliyor; istenirse dart-define ile boşaltılabilir.
+  final _email = TextEditingController(
+    text: const String.fromEnvironment('DEFAULT_LOGIN_EMAIL', defaultValue: 'admin@qrserve.co'),
+  );
+  final _password = TextEditingController(
+    text: const String.fromEnvironment('DEFAULT_LOGIN_PASSWORD', defaultValue: '1'),
+  );
   String? _error;
   bool _busy = false;
 
@@ -139,7 +145,6 @@ class _CloudLoginScreenState extends State<CloudLoginScreen> {
                       ),
                       const SizedBox(height: 20),
                       Text(
-                        'Yerel demo: superadmin@quickserve.local / demo\n'
                         'Restoran personeli → QuickServe Edge (edge_frontend).',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
