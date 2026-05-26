@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
-# edge_frontend (Flutter Web) → build/web
+# ⚠ DEPRECATED — Üretim için ARTIK GEREKMİYOR.
+# Edge frontend artık `deploy/edge/Dockerfile.caddy` içinde derleniyor;
+# `docker compose up -d --build` veya `build-edge-images.sh` tek başına yeterli.
+#
+# Bu script sadece Flutter dev'i Mac/Linux host'unda hızlıca build/web çıktısını
+# almak isteyenler için (örn. service worker debug, statik analiz) bırakılmıştır.
+#
 # EDGE_BASE_URL ve CLOUD_BASE_URL boş bırakılırsa istekler sayfa origin'ine gider:
 #   * Personel LAN'da edge.local üzerinden açar -> Caddy hem web hem API'yi karşılar
 #   * Cloudflare Tunnel hostname üzerinden de aynı şekilde çalışır.

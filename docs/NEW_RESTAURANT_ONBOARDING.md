@@ -122,16 +122,43 @@ sudo usermod -aG docker quickserve
 # logout/login
 ```
 
-**Adım 3: Repo + Edge dosyaları**
+**Adım 3: Self-contained Edge bundle (sen build sunucusunda hazırlamış olmalısın)**
+
+Senin ofisinde, restorana gitmeden önce **bir kez** build:
+
 ```bash
-sudo mkdir -p /opt/quickserve && sudo chown quickserve:quickserve /opt/quickserve
-cd /opt/quickserve
-git clone https://github.com/<senin-repo>/quickserve.git .
-cd deploy/edge
-cp .env.example .env
+# Build sunucusunda (Mac/Linux)
+cd ~/Desktop/projects/quickserve
+./deploy/scripts/build-edge-images.sh --tag v0.1.0 --platform linux/amd64
+# → /tmp/quickserve-edge-bundle-v0.1.0.tar.gz (≈190 MB, içinde imaj + compose + install.sh)
 ```
 
+Edge cihazına bu **tek dosyayı** taşı (USB / scp), ve aç:
+
+```bash
+# Edge cihazında (kod tabanı / git clone GEREKMEZ)
+mkdir -p ~/quickserve-install && cd ~/quickserve-install
+# tar.gz'i buraya kopyala (USB veya scp ile)
+
+sha256sum -c quickserve-edge-bundle-v0.1.0.tar.gz.sha256   # doğrulama
+tar -xzf quickserve-edge-bundle-v0.1.0.tar.gz
+cd quickserve-edge-bundle-v0.1.0
+
+# install.sh: docker load + /opt/quickserve/deploy/edge oluştur + .env hazırla
+sudo bash install.sh
+```
+
+> **Neden bundle?** Restoran cihazının interneti zayıf olabilir, sahada `git clone` + Docker build (Maven + Flutter SDK pull, ≈3 GB) yapacak vakit/bant genişliği yok. Senin tarafta `build-edge-images.sh` self-contained tar.gz çıkarır, cihazda sadece tek komutluk install (≈30 sn).
+
 **Adım 4: `.env` doldur** (bu restoran için)
+
+`install.sh` zaten `.env`'i `.env.example`'dan oluşturup `EDGE_TAG`'i otomatik set etti. Şimdi placeholder değerleri gerçeklerle değiştir:
+
+```bash
+sudo nano /opt/quickserve/deploy/edge/.env
+```
+
+Doldurulacak alanlar:
 
 ```env
 # Restoran kimliği
@@ -159,24 +186,19 @@ QUICKSERVE_GUEST_LAB_ENABLED=false
 
 > ⚠️ **`.env` dosyasını parola kasanda sakla** (Bitwarden / 1Password). Restoran adı altında entry oluştur, JWT secret + DB password + Cloudflared token + Restaurant UUID hepsini içine koy. **Bu olmazsa felaket kurtarma yapamazsın.**
 
-**Adım 5: Frontend build (yerel makinende)**
-```bash
-# Senin geliştirme makinende, restoran cihazında DEĞİL:
-cd ~/Desktop/projects/quickserve
-./deploy/scripts/build-edge-frontend.sh
-
-# Sonra Edge cihazına gönder:
-rsync -avz edge_frontend/build/web/ quickserve@edge-lezzet.local:/opt/quickserve/edge_frontend/build/web/
-```
-
-**Adım 6: İlk başlatma (ofisteyken test et)**
+**Adım 5: İlk başlatma (ofisteyken test et)**
 
 ```bash
-# Edge cihazında
-cd /opt/quickserve/deploy/edge
-docker compose up -d --build
+# Edge cihazında — `--build` YOK, imajlar zaten Adım 3'te yüklendi
+cd ~/quickserve-install/quickserve-edge-bundle-v0.1.0
+sudo bash install.sh --start
+
+# Veya manuel:
+cd /opt/quickserve/deploy/edge && docker compose up -d
 docker compose logs -f edge cloudflared
 ```
+
+İlk açılış: postgres init ~10 sn, edge Spring Boot ~30 sn, cloudflared register ~5 sn. Toplam ~1 dk içinde hazır.
 
 Beklenen log satırları:
 - `Started EdgeApplication`
@@ -184,7 +206,7 @@ Beklenen log satırları:
 - `cloudflared` Connection registered
 - Cloud panelinden bak: restoran **ONLINE**
 
-**Adım 7: Smoke test ofiste**
+**Adım 6: Smoke test ofiste**
 
 ```bash
 # Public Edge URL erişilebilir mi?
@@ -196,7 +218,7 @@ curl -sS https://edge-lezzet.qrserve.co/api/v1/edge/info
 # Lezzet Durağı → ONLINE, Edge URL doğru
 ```
 
-**Adım 8: Cihazı kapat, kurulum çantasına koy**
+**Adım 7: Cihazı kapat, kurulum çantasına koy**
 
 ```bash
 sudo shutdown -h now

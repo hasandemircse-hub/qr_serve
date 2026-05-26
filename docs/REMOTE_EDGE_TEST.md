@@ -77,17 +77,33 @@ Arkadaşın da panel görsün diye:
 
 > **Token = Tunnel kimliği.** Cloudflared container'ı bu token ile çalıştığında, Cloudflare'e "ben tunnel X'in connector'üyüm" der ve oluşturduğun tunnel'a bağlanır. Hangi makinede çalıştığı önemli değil — token nereye yapıştırsan o makine bu tunnel'ın bir bacağı olur.
 
-### A4. Edge frontend'i build et (10 dk)
+### A4. Self-contained Edge bundle build et — tek `.tar.gz` (10-15 dk)
 
-Arkadaşının Flutter kurmasına gerek yok — sen build edersin, zip atarsın.
+Arkadaşının ne Flutter ne Maven kurmasına, hatta **git clone'a bile** gerek var; sen lokalde edge backend + frontend gömülü Caddy imajlarını + compose + Caddyfile + install scriptini **tek pakete** koyarsın.
 
 ```bash
 cd ~/Desktop/projects/quickserve
-./deploy/scripts/build-edge-frontend.sh
 
-cd edge_frontend/build
-zip -r ~/Desktop/edge_frontend_web.zip web/
+# Linux x86_64 VM/PC için (en yaygın):
+./deploy/scripts/build-edge-images.sh --tag v0.1.0 --platform linux/amd64
+
+# Raspberry Pi / ARM mini PC için:
+./deploy/scripts/build-edge-images.sh --tag v0.1.0 --platform linux/arm64
 ```
+
+Çıktı: `/tmp/quickserve-edge-bundle-v0.1.0.tar.gz` (≈190 MB) + `.sha256`. İçinde:
+
+```
+images/edge.tar              ← Backend imajı
+images/edge-caddy.tar        ← Caddy + Flutter Web (frontend gömülü)
+deploy/docker-compose.yml    ← Compose dosyası (image: + build: hibrit)
+deploy/Caddyfile             ← Caddy konfig (referans; imajda zaten gömülü)
+deploy/.env.example          ← .env şablonu (EDGE_TAG=v0.1.0 dahil)
+install.sh                   ← Edge cihazında tek komutla kurulum
+VERSION                      ← Bundle metadata
+```
+
+> **Neden bundle?** Edge cihazının interneti/diski/işlemcisi zayıf olabilir. Edge'de **ne `git pull`, ne `docker build`** gerekir. Sadece `tar -xzf` + `install.sh`. Flutter SDK pull yok, Maven download yok, kod tabanı klonu yok.
 
 ### A5. Arkadaşa "kurulum kiti" hazırla (10 dk)
 
@@ -134,8 +150,7 @@ QUICKSERVE_MEDIA_MAX_IMAGE_BYTES=5242880
 | Dosya | Açıklama |
 |---|---|
 | `.env` | Yukarıda doldurduğun (en hassas — Signal/Bitwarden ile gönder) |
-| `edge_frontend_web.zip` | A4'te ürettiğin (normal kanaldan ok) |
-| `quickserve.zip` veya repo erişimi | Kod paketi (`git archive HEAD -o ~/Desktop/quickserve.zip`) |
+| `quickserve-edge-bundle-v0.1.0.tar.gz` + `.sha256` | A4'te ürettiğin bundle (≈190 MB; içinde imajlar + compose + install.sh) |
 | Bu doküman | Arkadaş kurulum talimatı olarak okur |
 
 ### A6. Kit'i güvenli kanaldan gönder (5 dk)
@@ -168,40 +183,52 @@ sudo usermod -aG docker $USER
 
 **Test:** `docker run hello-world` → başarılı çıktı görmeli.
 
-### B2-B5. Dosyaları yerleştir (10 dk)
+### B2-B4. Bundle'ı aç ve kur (5-10 dk)
 
 ```bash
-mkdir -p ~/quickserve && cd ~/quickserve
+# (1) Bundle ve .env'i bir yere koy
+mkdir -p ~/quickserve-install && cd ~/quickserve-install
+mv ~/Downloads/quickserve-edge-bundle-v0.1.0.tar.gz* .
 
-# Kod paketi
-unzip ~/Downloads/quickserve.zip -d ~/quickserve
-# veya
-# git clone https://github.com/<senin-repo>/quickserve.git .
+# (2) Hash doğrula
+sha256sum -c quickserve-edge-bundle-v0.1.0.tar.gz.sha256   # OK görmeli
 
-# .env
-cp ~/Downloads/env-ahmet.txt ~/quickserve/deploy/edge/.env
+# (3) Aç
+tar -xzf quickserve-edge-bundle-v0.1.0.tar.gz
+cd quickserve-edge-bundle-v0.1.0
 
-# Edge frontend
-mkdir -p ~/quickserve/edge_frontend/build
-unzip ~/Downloads/edge_frontend_web.zip -d ~/quickserve/edge_frontend/build/
-ls ~/quickserve/edge_frontend/build/web/  # index.html görmeli
+# (4) İlk kurulum — imajları yükle, compose dosyalarını /opt/quickserve'e koy,
+# .env'i .env.example'dan oluştur (henüz placeholder değerler).
+sudo bash install.sh
+
+# (5) .env'i editle: arkadaşın gönderdiği değerleri yapıştır
+sudo nano /opt/quickserve/deploy/edge/.env
+# - QUICKSERVE_EDGE_ID, QUICKSERVE_RESTAURANT_ID
+# - CLOUDFLARED_TUNNEL_TOKEN
+# - POSTGRES_PASSWORD, QUICKSERVE_JWT_SECRET, QUICKSERVE_SYNC_SHARED_SECRET
+# - QUICKSERVE_PUBLIC_EDGE_URL
+# (EDGE_TAG zaten doğru ayarlanmış olacak; install.sh otomatik set ediyor)
 ```
 
-### B6. Docker compose ile ayağa kaldır (15-25 dk — ilk seferde build uzun)
+### B5. Servisleri başlat (1-2 dk — build YOK)
 
 ```bash
-cd ~/quickserve/deploy/edge
-docker compose up -d --build
+cd ~/quickserve-install/quickserve-edge-bundle-v0.1.0
+sudo bash install.sh --start
+
+# Veya manuel:
+cd /opt/quickserve/deploy/edge && docker compose up -d
 ```
 
 İlerleme:
 ```bash
+cd /opt/quickserve/deploy/edge
 docker compose logs -f edge
 ```
 
-Şu satırı görmeli (5+ dk sonra): `Started EdgeApplication in 12.3 seconds`
+Şu satırı görmeli (~30 sn sonra; build olmadığı için çok hızlı): `Started EdgeApplication in 12.3 seconds`
 
-### B7. Sağlık kontrolü (2 dk)
+### B6. Sağlık kontrolü (2 dk)
 
 ```bash
 docker compose ps  # 4 servis "Up"

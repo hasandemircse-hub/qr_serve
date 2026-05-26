@@ -1,0 +1,38 @@
+# syntax=docker/dockerfile:1.7
+# QuickServe Edge — Caddy (frontend baked in)
+# Multi-stage: Flutter Web build → Caddy static serve
+# Build context: repo root
+#
+# Bu Dockerfile sayesinde Edge kurulumunda host makinada flutter
+# SDK olması gerekmez. `docker compose up -d --build caddy` tek başına
+# edge_frontend'i imaj içinde derler, Caddy üzerinden serve eder.
+
+FROM ghcr.io/cirruslabs/flutter:stable AS flutter-builder
+WORKDIR /build
+
+# Bazı image'larda git, safe.directory uyarısı verir; cache invalidation'ı
+# önlemek için baştan global olarak aç.
+RUN git config --global --add safe.directory '*' \
+    && git config --global --add safe.directory /build
+
+# Bağımlılıkları önce kopyala → katman cache'i (kod değişse de pub get tekrar koşmaz)
+COPY edge_frontend/pubspec.yaml edge_frontend/pubspec.lock ./
+RUN flutter pub get
+
+# Geri kalan kaynak ve asset'ler
+COPY edge_frontend/ ./
+
+# EDGE_BASE_URL / CLOUD_BASE_URL boş = istekler sayfa origin'ine gider
+# (Caddy hem static hem reverse-proxy yaptığı için aynı host yeterli).
+RUN flutter build web \
+    --release \
+    --dart-define=EDGE_BASE_URL= \
+    --dart-define=CLOUD_BASE_URL=
+
+# ────────────────────────────────────────────────────────────────────────
+# Çalıştırma katmanı — sadece Caddy + statik dosyalar + Caddyfile
+FROM caddy:2-alpine
+COPY --from=flutter-builder /build/build/web /srv/edge_frontend
+COPY deploy/edge/Caddyfile /etc/caddy/Caddyfile
+
+EXPOSE 80 443

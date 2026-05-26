@@ -88,6 +88,7 @@ Saha gerçekleri için altyapı sertleştirme.
 | 3.7 | CI/CD: GitHub Actions (test + build + deploy) | 2 gün | Manuel rsync sürdürülebilir değil |
 | 3.8 | Süperadmin şifre policy + 2FA opsiyonu | 1 gün | Senin hesabın çalınırsa felaket |
 | 3.9 | Per-restoran sync key (global secret → DB'de hash'lenmiş per-edge key) | 0.5 gün | FAZ 1.2'deki global secret blast radius'unu kapatır: bir Edge'in key'i sızsa sadece o etkilenir; rotation tek restoran |
+| 3.10 | ~~Self-contained Edge bundle (frontend + backend + compose + install.sh)~~ ✅ | 0.5 gün | `Dockerfile.caddy` Flutter SDK ile frontend'i imaj içinde derler; `build-edge-images.sh` build sunucusunda AMD64/ARM imaj üretip **tek bundle tar.gz** (imajlar + compose + Caddyfile + .env.example + `install.sh`) çıkartır. Edge'de `tar -xzf` + `bash install.sh` (≈30 sn), git clone / build / Maven / Flutter gereksiz, ≈190 MB transfer. |
 
 **Çıktı:** "Telefonum kapalıyken bile çalışan" üretim sistemi.
 

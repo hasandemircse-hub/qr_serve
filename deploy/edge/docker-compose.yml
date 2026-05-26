@@ -1,14 +1,25 @@
 # QuickServe Edge — Restoran makinesi docker-compose
-# Çalıştırma:
+#
+# İki çalıştırma modu (Edge için ÖNCELİKLİ olan "ÜRETİM"):
+#
+# ── ÜRETİM (Edge cihazı, zayıf donanım, sınırlı internet) ──────────────────
+#   1. Senin (build sunucusu) makinende build edip tar.gz olarak gönder:
+#      ./deploy/scripts/build-edge-images.sh
+#      → /tmp/quickserve-edge-images-<tag>.tar.gz çıkar (≈350 MB)
+#   2. Tar'ı Edge'e gönder: scp / rsync / USB
+#   3. Edge'de yükle ve başlat:
+#      docker load -i quickserve-edge-images-<tag>.tar.gz
+#      cp .env.example .env  (değerleri doldur)
+#      docker compose up -d                # `--build` YOK; image hazır
+#
+# ── GELİŞTİRİCİ (Mac, lokal dev, kodu hızlı dene) ─────────────────────────
 #   1. cp .env.example .env  (değerleri doldur)
-#   2. cloudflared tunnel create + credentials.json'u ./cloudflared/ içine koy
-#   3. ../scripts/build-edge-frontend.sh ile edge_frontend/build/web üretildiğine emin ol
-#   4. docker compose up -d --build
+#   2. docker compose up -d --build        # Mac'te kendisi build eder
 #
 # Servisler:
 #   postgres    : Edge yerel verisi (offline-first)
 #   edge        : Spring Boot Edge API (8081)
-#   caddy       : LAN reverse proxy + edge_frontend statik
+#   caddy       : LAN reverse proxy + edge_frontend (Flutter Web, imaj içinde gömülü)
 #   cloudflared : Cloudflare Tunnel sidecar (misafir trafiği için)
 
 name: quickserve-edge
@@ -30,6 +41,9 @@ services:
       retries: 10
 
   edge:
+    # ÜRETİM: tar.gz ile yüklenen image ismi (build-edge-images.sh tag'ler).
+    # DEV: local'de image yoksa Mac'te kendisi build eder.
+    image: quickserve/edge:${EDGE_TAG:-local}
     build:
       context: ../..
       dockerfile: deploy/edge/Dockerfile
@@ -59,7 +73,14 @@ services:
       - "8081"
 
   caddy:
-    image: caddy:2-alpine
+    # Multi-stage Dockerfile.caddy edge_frontend'i (Flutter Web) imaj içinde derler.
+    # Host'ta `flutter` kurulu olması gerekmez.
+    # ÜRETİM: tar.gz ile yüklenir; build atlanır.
+    # DEV: local'de image yoksa Mac'te kendisi build eder (~45 sn).
+    image: quickserve/edge-caddy:${EDGE_TAG:-local}
+    build:
+      context: ../..
+      dockerfile: deploy/edge/Dockerfile.caddy
     restart: unless-stopped
     depends_on:
       - edge
@@ -69,8 +90,6 @@ services:
     environment:
       EDGE_LAN_HOSTNAME: ${EDGE_LAN_HOSTNAME:-edge.local}
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ../../edge_frontend/build/web:/srv/edge_frontend:ro
       - caddy_data:/data
       - caddy_config:/config
 
