@@ -5,6 +5,7 @@
 
 İlgili belgeler:
 - [QUICKSERVE_PLAN.md](./QUICKSERVE_PLAN.md) — Ürün ve mevcut kod durumu
+- [QUICKSERVE_FOOLPROOF_PLAN.md](./QUICKSERVE_FOOLPROOF_PLAN.md) — Pilot öncesi 15 maddelik atomik sağlamlaştırma planı (FAZ 1'in detayı)
 - [DEPLOY_TEST.md](./DEPLOY_TEST.md) — İlk Cloud/Edge deploy
 - [NEW_RESTAURANT_ONBOARDING.md](./NEW_RESTAURANT_ONBOARDING.md) — Restoran kurulum playbook
 - [REMOTE_EDGE_TEST.md](./REMOTE_EDGE_TEST.md) — Uzaktan test Edge kurulumu
@@ -47,7 +48,8 @@ Mevcut sistemde "Kısmen" olan ama kritik parçalar + birikmiş teknik borç.
 | 1.5 | E2E test paketi (Playwright veya Selenium) | 2 gün | Müşteri QR → sipariş → kasa → kapanış otomatik test |
 | 1.6 | Yazıcı yönetim UI (kategoriye atama, test yazdırma) | 1 gün | "Kısmen" — kod var, UI yok |
 | 1.7 | `QUICKSERVE_PLAN.md` changelog güncelleme | 0.5 gün | Doküman planın gerisinde |
-| 1.8 | Backup + restore script (Edge + Cloud Postgres) | 1 gün | Disaster recovery senaryolarını şimdiden çöz |
+| 1.8 | Backup + restore script (Edge + Cloud Postgres) | 1 gün | Disaster recovery senaryolarını şimdiden çöz — bkz. [FOOLPROOF_PLAN F14](./QUICKSERVE_FOOLPROOF_PLAN.md) |
+| 1.9 | **Fool-proof sağlamlaştırma paketi (15 atomik madde)** | ~9-10 gün | 2026-05-29 denetiminde tespit edilen ~30 KRİTİK eksiklik. Sipariş idempotency, optimistic lock handler, sync LWW düzeltmesi, WS auth, Flutter reconnect, Actuator, print outbox, vb. **Pilot için ŞART.** Detay ve takip: [QUICKSERVE_FOOLPROOF_PLAN.md](./QUICKSERVE_FOOLPROOF_PLAN.md) |
 
 **Çıktı:** Üretime tam hazır, test edilmiş, dokumante teknik MVP.
 

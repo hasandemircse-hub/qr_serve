@@ -7,6 +7,7 @@ import 'auth/auth_session.dart';
 import 'config/resolve_cloud_base_url.dart';
 import 'config/resolve_edge_base_url.dart';
 import 'router/app_router.dart';
+import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -70,10 +71,7 @@ class _QuickServeEdgeAppState extends State<QuickServeEdgeApp> {
   Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'QuickServe Edge',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.light(),
       routerConfig: _router,
     );
   }

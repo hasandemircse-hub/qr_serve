@@ -7,7 +7,6 @@ import '../widgets/staff_profile_banner.dart';
 import '../layout/floor_design_editor_screen.dart';
 import '../layout/floor_layout_terminal_screen.dart';
 import '../admin/menu_admin_screen.dart';
-import '../admin/product_options_admin_screen.dart';
 import '../admin/staff_admin_screen.dart';
 import '../billing/closure_balance_report_screen.dart';
 
@@ -62,7 +61,6 @@ class _RestaurantAdminLandingState extends State<RestaurantAdminLanding> {
       0 => 'Salon düzeni',
       1 => 'Kat planı editörü',
       2 => 'Menü yönetimi',
-      3 => 'Ürün seçenekleri',
       _ => 'Personel',
     };
   }
@@ -71,7 +69,6 @@ class _RestaurantAdminLandingState extends State<RestaurantAdminLanding> {
     'Salon',
     'Kat planı',
     'Menü',
-    'Seçenekler',
     'Personel',
   ];
 
@@ -119,12 +116,12 @@ class _RestaurantAdminLandingState extends State<RestaurantAdminLanding> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-              child: StaffProfileBanner(
+              child:               StaffProfileBanner(
                 auth: widget.auth,
                 roleLabel: 'RESTORAN YÖNETİCİSİ',
                 icon: Icons.admin_panel_settings_outlined,
                 subtitle:
-                    'Salon, Kat planı, Menü, Seçenekler veya Personel sekmesine geçin.',
+                    'Salon, Kat planı, Menü veya Personel sekmesine geçin.',
               ),
             ),
             ListTile(
@@ -148,7 +145,6 @@ class _RestaurantAdminLandingState extends State<RestaurantAdminLanding> {
                   0 => Icons.table_restaurant,
                   1 => Icons.design_services_outlined,
                   2 => Icons.restaurant_menu_outlined,
-                  3 => Icons.tune_outlined,
                   _ => Icons.groups_outlined,
                 }),
                 title: Text(_navLabels[i]),
@@ -181,11 +177,6 @@ class _RestaurantAdminLandingState extends State<RestaurantAdminLanding> {
             label: 'Menü',
           ),
           NavigationDestination(
-            icon: Icon(Icons.tune_outlined),
-            selectedIcon: Icon(Icons.tune),
-            label: 'Seçenekler',
-          ),
-          NavigationDestination(
             icon: Icon(Icons.groups_outlined),
             selectedIcon: Icon(Icons.groups),
             label: 'Personel',
@@ -208,12 +199,6 @@ class _RestaurantAdminLandingState extends State<RestaurantAdminLanding> {
             edgeBaseUrl: widget.edgeBaseUrl,
             accessToken: widget.auth.accessToken,
             restaurantId: _effectiveRestaurantId,
-          ),
-          ProductOptionsAdminScreen(
-            edgeBaseUrl: widget.edgeBaseUrl,
-            authToken: widget.auth.accessToken ?? '',
-            restaurantId: _effectiveRestaurantId,
-            initialProductId: widget.demoProductId,
           ),
           StaffAdminScreen(
             edgeBaseUrl: widget.edgeBaseUrl,
